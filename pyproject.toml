@@ -3,4 +3,18 @@ name = "my-deer-flow"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+	"openai>=1.99.9",
+	"fastapi>=0.115.0",
+	"uvicorn>=0.34.0",
+	"python-dotenv>=1.0.0",
+]
+
+[dependency-groups]
+dev = [
+	"pytest>=8.4.2",
+	"pytest-asyncio>=1.2.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
