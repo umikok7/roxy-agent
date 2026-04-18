@@ -66,6 +66,7 @@ class OpenAIChatCompletionsClient:
             kwargs["max_tokens"] = max_tokens
 
         if on_delta is not None:
+            # 开启 OpenAI streaming
             kwargs["stream"] = True
 
             stream = await self._client.chat.completions.create(**kwargs)
