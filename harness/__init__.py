@@ -1,0 +1,1 @@
+"""Minimal harness package scaffold."""
