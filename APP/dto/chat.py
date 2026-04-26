@@ -3,9 +3,16 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 
+class HistoryMessage(BaseModel):
+    role: str
+    content: str
+
+
 class ChatRequest(BaseModel):
     message: str
     model: str | None = None
+    thread_id: str | None = None
+    messages: list[HistoryMessage] | None = None
 
 
 class TraceInfo(BaseModel):

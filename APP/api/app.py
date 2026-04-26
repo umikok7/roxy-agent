@@ -29,7 +29,12 @@ def _sse_event(payload: dict[str, object]) -> str:
 async def chat(request: ChatRequest) -> ChatResponse:
     service = get_chat_service()
     try:
-        result: AgentRunResult = await service.run_chat(request.message, request.model)
+        result: AgentRunResult = await service.run_chat(
+            request.message,
+            request.model,
+            thread_id=request.thread_id,
+            messages=[item.model_dump() for item in (request.messages or [])],
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -51,7 +56,12 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
 
     async def event_generator() -> AsyncIterator[str]:
         try:
-            async for event in service.run_chat_stream(request.message, request.model):
+            async for event in service.run_chat_stream(
+                request.message,
+                request.model,
+                thread_id=request.thread_id,
+                messages=[item.model_dump() for item in (request.messages or [])],
+            ):
                 yield _sse_event(event)
                 await asyncio.sleep(0)
         except ValueError as exc:
@@ -108,4 +118,3 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
     return app
-

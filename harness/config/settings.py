@@ -34,6 +34,9 @@ class SandboxConfig:
 class RuntimeConfig:
     max_steps: int = 8
     max_output_chars: int = 12000
+    max_recent_messages: int = 16
+    compact_threshold_chars: int = 24000
+    skill_memory_max: int = 12
 
 
 @dataclass(slots=True)
@@ -77,6 +80,9 @@ def load_harness_config(project_root: Path | None = None) -> HarnessConfig:
 
     max_steps = int(os.getenv("HARNESS_MAX_STEPS", "8"))
     max_output_chars = int(os.getenv("HARNESS_MAX_OUTPUT_CHARS", "12000"))
+    max_recent_messages = int(os.getenv("HARNESS_CONTEXT_MAX_RECENT_MESSAGES", "16"))
+    compact_threshold_chars = int(os.getenv("HARNESS_CONTEXT_COMPACT_THRESHOLD_CHARS", "24000"))
+    skill_memory_max = int(os.getenv("HARNESS_CONTEXT_SKILL_MEMORY_MAX", "12"))
 
     return HarnessConfig(
         models=models,
@@ -84,5 +90,11 @@ def load_harness_config(project_root: Path | None = None) -> HarnessConfig:
         sandbox=SandboxConfig(
             root_dir=Path(sandbox_root).resolve(), command_timeout_seconds=timeout
         ),
-        runtime=RuntimeConfig(max_steps=max_steps, max_output_chars=max_output_chars),
+        runtime=RuntimeConfig(
+            max_steps=max_steps,
+            max_output_chars=max_output_chars,
+            max_recent_messages=max_recent_messages,
+            compact_threshold_chars=compact_threshold_chars,
+            skill_memory_max=skill_memory_max,
+        ),
     )

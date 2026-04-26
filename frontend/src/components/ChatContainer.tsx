@@ -13,6 +13,10 @@ function generateMessageId(): string {
   return `msg-${Date.now()}-${++messageIdCounter}`;
 }
 
+function generateThreadId(): string {
+  return `thread-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function ChatContainer() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -20,6 +24,7 @@ export function ChatContainer() {
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [isModelsLoading, setIsModelsLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const threadIdRef = useRef<string>(generateThreadId());
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -47,6 +52,11 @@ export function ChatContainer() {
   }, []);
 
   const handleSendMessage = async (content: string) => {
+    const previousMessages = messages.map((item) => ({
+      role: item.role,
+      content: item.content,
+    }));
+
     const userMessage: Message = {
       id: generateMessageId(),
       role: "user",
@@ -68,7 +78,12 @@ export function ChatContainer() {
 
     try {
       await sendMessageStream(
-        { message: content, model: selectedModel || undefined },
+        {
+          message: content,
+          model: selectedModel || undefined,
+          thread_id: threadIdRef.current,
+          messages: previousMessages,
+        },
         {
           onDelta: (delta) => {
             setMessages((prev) =>

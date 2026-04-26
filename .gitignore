@@ -14,3 +14,10 @@ __pycache__
 ./frontend/node_modules
 ./harness/.sandbox
 TODO.md
+.agents
+skills/custom/roxy-skill
+skills/public/example
+skills-lock.json
+.sandbox
+.pyctest_cache
+.runtime

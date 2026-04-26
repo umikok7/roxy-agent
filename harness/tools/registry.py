@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from harness.sandbox.runtime import BasicSandbox
+from harness.tools.web_search import WebSearchClient
 
 ToolHandler = Callable[[dict[str, Any]], Awaitable[str]]
 
@@ -45,8 +46,14 @@ class ToolRegistry:
         return schemas
 
     @classmethod
-    def with_default_tools(cls, sandbox: BasicSandbox) -> "ToolRegistry":
+    def with_default_tools(
+        cls,
+        sandbox: BasicSandbox,
+        *,
+        web_search_client: WebSearchClient | None = None,
+    ) -> "ToolRegistry":
         registry = cls()
+        search_client = web_search_client or WebSearchClient()
 
         async def bash_tool(args: dict[str, Any]) -> str:
             command = str(args.get("command", ""))
@@ -74,6 +81,11 @@ class ToolRegistry:
             new_str = str(args.get("new_str", ""))
             replace_all = bool(args.get("replace_all", False))
             return await asyncio.to_thread(sandbox.str_replace, path, old_str, new_str, replace_all)
+
+        async def web_search_tool(args: dict[str, Any]) -> str:
+            query = str(args.get("query", ""))
+            max_results = int(args.get("max_results", 5))
+            return await asyncio.to_thread(lambda: search_client.search(query, max_results=max_results))
 
         registry.register(
             ToolSpec(
@@ -148,6 +160,24 @@ class ToolRegistry:
                 },
             ),
             str_replace_tool,
+        )
+        registry.register(
+            ToolSpec(
+                name="web_search",
+                description="Search the public web and return a short list of relevant results.",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search query."},
+                        "max_results": {
+                            "type": "integer",
+                            "description": "Maximum number of results to return (1-10).",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            ),
+            web_search_tool,
         )
 
         return registry

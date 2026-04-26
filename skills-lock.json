@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "roxy-skill": {
+      "source": "umikok7/roxy-skill",
+      "sourceType": "github",
+      "computedHash": "74967d304762c6f91dd25aadae08f5ffce54d3922e7bd4c1537e3e85170adc0e"
+    }
+  }
+}

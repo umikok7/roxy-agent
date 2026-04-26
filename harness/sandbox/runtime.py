@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -16,12 +17,33 @@ class SandboxExecutionError(SandboxError):
     """Raised when command execution fails."""
 
 
+_DANGEROUS_COMMAND_PATTERNS: tuple[tuple[str, str], ...] = (
+    (r"(^|[;&|()])\s*rm\s+-[A-Za-z]*[rf][A-Za-z]*\b", "recursive rm is not allowed"),
+    (r"(^|[;&|()])\s*sudo\b", "sudo is not allowed"),
+    (r"(^|[;&|()])\s*(shutdown|reboot|halt|poweroff)\b", "system power commands are not allowed"),
+    (r"(^|[;&|()])\s*(mkfs|fdisk|diskutil\s+eraseDisk|diskutil\s+partitionDisk)\b", "disk formatting commands are not allowed"),
+    (r"(^|[;&|()])\s*dd\b", "raw disk copy commands are not allowed"),
+    (r"(^|[;&|()])\s*mv\s+.+\s+/dev/null\b", "destructive move commands are not allowed"),
+)
+
+
 class BasicSandbox:
-    def __init__(self, root_dir: Path, *, command_timeout_seconds: int = 60, max_output_chars: int = 12000) -> None:
+    def __init__(
+        self,
+        root_dir: Path,
+        *,
+        command_cwd: Path | None = None,
+        command_timeout_seconds: int = 60,
+        max_output_chars: int = 12000,
+    ) -> None:
         self.root_dir = root_dir.resolve()
+        self.command_cwd = (command_cwd or self.root_dir).resolve()
         self.command_timeout_seconds = command_timeout_seconds
         self.max_output_chars = max_output_chars
+        if not self.command_cwd.is_relative_to(self.root_dir):
+            raise SandboxPermissionError(f"Command cwd is outside sandbox root: {self.command_cwd}")
         self.root_dir.mkdir(parents=True, exist_ok=True)
+        self.command_cwd.mkdir(parents=True, exist_ok=True)
 
     def _truncate(self, text: str) -> str:
         if len(text) <= self.max_output_chars:
@@ -40,14 +62,23 @@ class BasicSandbox:
             raise SandboxPermissionError(f"Path is outside sandbox root: {user_path}")
         return resolved
 
-    def run_bash(self, command: str) -> str:
-        if not command.strip():
+    def _guard_command(self, command: str) -> None:
+        normalized = command.strip()
+        if not normalized:
             raise SandboxExecutionError("Command cannot be empty")
+
+        lowered = normalized.lower()
+        for pattern, reason in _DANGEROUS_COMMAND_PATTERNS:
+            if re.search(pattern, lowered):
+                raise SandboxPermissionError(f"Blocked dangerous command: {reason}")
+
+    def run_bash(self, command: str) -> str:
+        self._guard_command(command)
 
         completed = subprocess.run(
             command,
             shell=True,
-            cwd=self.root_dir,
+            cwd=self.command_cwd,
             capture_output=True,
             text=True,
             timeout=self.command_timeout_seconds,
