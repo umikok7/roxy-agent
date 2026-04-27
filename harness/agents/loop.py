@@ -179,6 +179,37 @@ class AsyncAgentLoop:
     ) -> AgentRunResult:
         return await self._run_impl(user_prompt, history_messages=history_messages)
 
+    async def run_with_stream(
+        self,
+        user_prompt: str,
+        *,
+        on_text_delta: Callable[[str], Awaitable[None] | None] | None = None,
+        history_messages: list[ChatMessage] | None = None,
+    ) -> AgentRunResult:
+        return await self._run_impl(
+            user_prompt,
+            on_text_delta=on_text_delta,
+            history_messages=history_messages,
+        )
+
+    @staticmethod
+    def _normalize_history(history_messages: list[ChatMessage]) -> list[ChatMessage]:
+        normalized: list[ChatMessage] = []
+        for item in history_messages:
+            if not isinstance(item, dict):
+                continue
+            role = item.get("role")
+            content = item.get("content")
+            if role not in {"user", "assistant"}:
+                continue
+            if not isinstance(content, str):
+                continue
+            text = content.strip()
+            if not text:
+                continue
+            normalized.append({"role": role, "content": text})
+        return normalized
+
     async def _run_impl(
         self,
         user_prompt: str,
@@ -244,37 +275,6 @@ class AsyncAgentLoop:
         if final_text:
             timeout_text = f"{final_text}\n\n{timeout_text}"
         return AgentRunResult(text=timeout_text, trace=trace)
-
-    async def run_with_stream(
-        self,
-        user_prompt: str,
-        *,
-        on_text_delta: Callable[[str], Awaitable[None] | None] | None = None,
-        history_messages: list[ChatMessage] | None = None,
-    ) -> AgentRunResult:
-        return await self._run_impl(
-            user_prompt,
-            on_text_delta=on_text_delta,
-            history_messages=history_messages,
-        )
-
-    @staticmethod
-    def _normalize_history(history_messages: list[ChatMessage]) -> list[ChatMessage]:
-        normalized: list[ChatMessage] = []
-        for item in history_messages:
-            if not isinstance(item, dict):
-                continue
-            role = item.get("role")
-            content = item.get("content")
-            if role not in {"user", "assistant"}:
-                continue
-            if not isinstance(content, str):
-                continue
-            text = content.strip()
-            if not text:
-                continue
-            normalized.append({"role": role, "content": text})
-        return normalized
 
 
 OpenAIResponsesClient = OpenAIChatCompletionsClient
