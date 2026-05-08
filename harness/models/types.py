@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from harness.rag.service import KnowledgeBaseService
 
 
 @dataclass(slots=True)
@@ -85,6 +88,7 @@ class RuntimeContext:
     subagent_depth: int = 0
     max_subagents: int = 3
     subagent_timeout_seconds: int = 900
+    knowledge_base: KnowledgeBaseService | None = None
 
 
 ConversationInput = list[dict[str, Any]]

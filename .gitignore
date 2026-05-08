@@ -27,3 +27,5 @@ desktop/node_modules
 desktop/dist
 desktop/src/renderer-dist
 /artifacts
+/data
+

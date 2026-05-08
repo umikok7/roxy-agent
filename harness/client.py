@@ -11,6 +11,7 @@ from harness.agents.prompt import build_system_instructions
 from harness.config.settings import HarnessConfig, load_harness_config
 from harness.context import ThreadRuntimePaths
 from harness.models.types import AgentRunResult, RuntimeContext
+from harness.rag import KnowledgeBaseService
 from harness.sandbox.runtime import BasicSandbox
 from harness.skills import Skill, load_skills
 from harness.subagents import (
@@ -40,6 +41,12 @@ class HarnessClient:
         self._project_root = resolve_project_root(project_root or Path.cwd())
         self.config = config or load_harness_config(self._project_root)
         self._sandbox_root = self.config.sandbox.root_dir
+        self._knowledge_base: KnowledgeBaseService | None = None
+
+    def _get_knowledge_base(self) -> KnowledgeBaseService:
+        if self._knowledge_base is None:
+            self._knowledge_base = KnowledgeBaseService(self.config.rag)
+        return self._knowledge_base
 
     def _load_enabled_skills(
         self,
@@ -80,6 +87,7 @@ class HarnessClient:
         thread_paths: ThreadRuntimePaths | None,
         thread_id: str | None,
         subagent_depth: int,
+        knowledge_base: KnowledgeBaseService | None = None,
     ) -> RuntimeContext:
         return RuntimeContext(
             thread_id=thread_id,
@@ -89,6 +97,7 @@ class HarnessClient:
             subagent_depth=subagent_depth,
             max_subagents=self.config.runtime.max_concurrent_subagents,
             subagent_timeout_seconds=self.config.runtime.subagent_timeout_seconds,
+            knowledge_base=knowledge_base,
         )
 
     def _make_sandbox(self, thread_paths: ThreadRuntimePaths | None) -> BasicSandbox:
@@ -260,10 +269,12 @@ class HarnessClient:
     ) -> AsyncAgentLoop:
         selected_model = self.config.get_model(model_name)
         sandbox = self._make_sandbox(thread_paths)
+        knowledge_base = self._get_knowledge_base()
         effective_subagent_enabled = self.config.runtime.subagents_enabled if subagent_enabled is None else subagent_enabled
         include_task_tool = effective_subagent_enabled and subagent_depth == 0
         registry = ToolRegistry.with_default_tools(
             sandbox,
+            knowledge_base=knowledge_base,
             include_task_tool=include_task_tool,
         )
         if tool_allowlist is not None or tool_denylist is not None:
@@ -274,6 +285,7 @@ class HarnessClient:
             thread_paths=thread_paths,
             thread_id=thread_id,
             subagent_depth=subagent_depth,
+            knowledge_base=knowledge_base,
         )
 
         runtime = ToolRuntime(

@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from harness.rag.config import RagConfig, load_rag_config
+
 
 @dataclass(slots=True)
 class RegisteredModel:
@@ -48,6 +50,7 @@ class HarnessConfig:
     default_model: str
     sandbox: SandboxConfig
     runtime: RuntimeConfig
+    rag: RagConfig
 
     def get_model(self, model_name: str | None = None) -> RegisteredModel:
         target_name = model_name or self.default_model
@@ -106,4 +109,5 @@ def load_harness_config(project_root: Path | None = None) -> HarnessConfig:
             max_concurrent_subagents=max(1, max_concurrent_subagents),
             subagent_timeout_seconds=max(1, subagent_timeout_seconds),
         ),
+        rag=load_rag_config(root),
     )

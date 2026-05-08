@@ -13,7 +13,8 @@ const isMac = process.platform === 'darwin';
 const SERVER_PORT = 23333;
 const PET_SIZE = 150;
 const HIT_PADDING = 10;
-const SESSION_TTL_MS = 30 * 1000;
+const SESSION_TTL_MS = 10 * 60 * 1000;
+const CODEX_TURN_COMPLETE_GRACE_MS = 4000;
 
 const STATE_TO_SVG = {
     idle: 'roxy-idle.svg',
@@ -104,6 +105,7 @@ let dragSnapshot = null;
 let dragReactionActive = false;
 let chatModeActive = false;
 let currentPetState = 'idle';
+let dialogChatBusy = false;
 const externalSessions = new Map();
 
 function getSvgAssetPath(fileName) {
@@ -243,15 +245,18 @@ function resolveVisualState() {
         return 'react-drag';
     }
 
-    let hasWorking = false;
-    let hasTyping = false;
-    for (const session of externalSessions.values()) {
-        if (session.state === 'working') hasWorking = true;
-        if (session.state === 'working-typing') hasTyping = true;
+    if (dialogChatBusy) {
+        return 'working-typing';
     }
 
-    if (hasWorking) return 'working';
-    if (hasTyping) return 'working-typing';
+    let hasBusy = false;
+    for (const session of externalSessions.values()) {
+        if (session.state === 'working' || session.state === 'working-typing') {
+            hasBusy = true;
+        }
+    }
+
+    if (hasBusy) return 'working-typing';
     return 'idle';
 }
 
@@ -263,24 +268,55 @@ function broadcastPetState(force = false) {
 }
 
 function normalizeExternalState(rawState) {
-    if (rawState === 'working') return 'working';
-    if (rawState === 'thinking') return 'working-typing';
+    if (rawState === 'working' || rawState === 'thinking' || rawState === 'working-typing') {
+        return 'working-typing';
+    }
     return null;
+}
+
+function clearExternalSessionTimer(session) {
+    if (!session || !session.clearTimer) return;
+    clearTimeout(session.clearTimer);
+    session.clearTimer = null;
+}
+
+function scheduleExternalSessionClear(sessionId, delayMs = CODEX_TURN_COMPLETE_GRACE_MS) {
+    if (!sessionId) return;
+    const session = externalSessions.get(sessionId);
+    if (!session) return;
+    clearExternalSessionTimer(session);
+    session.clearTimer = setTimeout(() => {
+        const latest = externalSessions.get(sessionId);
+        if (!latest) return;
+        clearExternalSessionTimer(latest);
+        externalSessions.delete(sessionId);
+        broadcastPetState();
+    }, delayMs);
 }
 
 function upsertExternalSession(sessionId, state, meta = {}) {
     if (!sessionId) return;
     if (!state) {
+        const existing = externalSessions.get(sessionId);
+        if (existing) {
+            clearExternalSessionTimer(existing);
+        }
         externalSessions.delete(sessionId);
         broadcastPetState();
         return;
     }
 
+    const existing = externalSessions.get(sessionId);
+    if (existing) {
+        clearExternalSessionTimer(existing);
+    }
     externalSessions.set(sessionId, {
+        ...(existing || {}),
         state,
-        agentId: meta.agentId || 'unknown',
+        agentId: meta.agentId || existing?.agentId || 'unknown',
         updatedAt: Date.now(),
         event: meta.event || '',
+        clearTimer: null,
     });
     broadcastPetState();
 }
@@ -290,6 +326,7 @@ function cleanupExternalSessions() {
     let changed = false;
     for (const [sessionId, session] of externalSessions.entries()) {
         if (now - session.updatedAt > SESSION_TTL_MS) {
+            clearExternalSessionTimer(session);
             externalSessions.delete(sessionId);
             changed = true;
         }
@@ -446,6 +483,10 @@ function startCodexMonitor() {
                 return;
             }
             if (state === 'idle' || state === 'attention') {
+                if (event === 'event_msg:task_complete') {
+                    scheduleExternalSessionClear(sessionId, CODEX_TURN_COMPLETE_GRACE_MS);
+                    return;
+                }
                 upsertExternalSession(sessionId, null, { event, agentId: 'codex' });
             }
         });
@@ -637,6 +678,11 @@ ipcMain.on('dialog-input-focus', () => {
 ipcMain.on('dialog-input-blur', () => {
     if (!dialogWindow || dialogWindow.isDestroyed()) return;
     reapplyMacVisibility(dialogWindow, { mode: 'dialog' });
+});
+
+ipcMain.on('dialog-chat-busy', (_event, active) => {
+    dialogChatBusy = !!active;
+    broadcastPetState();
 });
 
 app.whenReady().then(() => {

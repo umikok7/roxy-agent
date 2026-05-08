@@ -9,6 +9,7 @@ dependencies = [
 	"uvicorn>=0.34.0",
 	"python-dotenv>=1.0.0",
 	"dataclasses>=0.8",
+	"qdrant-client[fastembed]>=1.15.1",
 ]
 
 [dependency-groups]

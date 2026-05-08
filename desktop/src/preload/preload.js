@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openChatDialog: () => ipcRenderer.send('open-chat-dialog'),
     closeDialog: () => ipcRenderer.send('close-dialog'),
     minimizeDialog: () => ipcRenderer.send('minimize-dialog'),
+    setDialogChatBusy: (active) => ipcRenderer.send('dialog-chat-busy', active),
     notifyDialogInputFocus: () => ipcRenderer.send('dialog-input-focus'),
     notifyDialogInputBlur: () => ipcRenderer.send('dialog-input-blur'),
     onStateChange: (callback) => ipcRenderer.on('state-change', (_event, state, svgPath) => callback(state, svgPath)),
