@@ -72,6 +72,37 @@ cd frontend && npm install && npm run dev
 cd desktop && npm install && npm run dev
 ```
 
+### 一键启动所有服务
+
+现在也可以直接从项目根目录统一管理全部服务：
+
+```bash
+# 首次安装依赖
+make bootstrap
+
+# 一键启动 qdrant + backend + frontend + desktop
+make up
+
+# 查看状态与健康检查
+make status
+make health
+
+# 查看日志
+make logs SERVICE=backend
+make frontend-logs
+make desktop-logs
+
+# 一键停止
+make down
+```
+
+运行说明：
+
+- `make up` 会后台启动 `qdrant`、FastAPI 后端、Next.js 前端和 Electron desktop
+- 日志会写入 `.runtime/logs/`
+- PID 文件会写入 `.runtime/pids/`
+- 如果只是想重启整套开发环境，可以直接执行 `make restart`
+
 ### 配置
 
 在项目根目录创建 `.env` 文件：

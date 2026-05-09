@@ -4,6 +4,8 @@ import roxyBackgroundPng from "../../../assets/roxy/roxy-background.png";
 import thinkingSvg from "../../../assets/roxy/roxy-thinking.svg";
 
 type MessageRole = "assistant" | "user";
+type ConversationSummary = Awaited<ReturnType<typeof window.electronAPI.fetchConversations>>[number];
+type ConversationDetail = Awaited<ReturnType<typeof window.electronAPI.fetchConversation>>;
 
 type TraceSummary = {
   steps: number;
@@ -42,8 +44,47 @@ type ConversationTurn = {
   trace: TraceSummary | null;
 };
 
+const ACTIVE_THREAD_STORAGE_KEY = "my-deer-flow-desktop-active-thread-id";
+
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function sortConversations(items: ConversationSummary[]) {
+  return [...items].sort((left, right) => new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime());
+}
+
+function upsertConversation(items: ConversationSummary[], nextItem: ConversationSummary) {
+  const nextList = items.filter((item) => item.thread_id !== nextItem.thread_id);
+  nextList.unshift(nextItem);
+  return sortConversations(nextList);
+}
+
+function buildMessagesFromConversation(detail: ConversationDetail): ChatMessage[] {
+  return detail.messages.map((message) => ({
+    id: message.id,
+    role: message.role,
+    content: message.content,
+  }));
+}
+
+function getConversationTitle(conversation: ConversationSummary | null) {
+  return conversation?.title?.trim() || "新的对白";
+}
+
+function formatRelativeTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return "刚刚";
+  if (diffMinutes < 60) return `${diffMinutes} 分钟前`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} 小时前`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays} 天前`;
+  return date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
 }
 
 function toPreviewText(userText: string, assistantText: string) {
@@ -173,13 +214,19 @@ export default function DialogApp() {
   const [selectedTurnId, setSelectedTurnId] = useState<string | null>(null);
   const [expandedToolIds, setExpandedToolIds] = useState<Record<string, boolean>>({});
   const [showReasoning, setShowReasoning] = useState(false);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [isConversationListLoading, setIsConversationListLoading] = useState(false);
+  const [isConversationLoading, setIsConversationLoading] = useState(false);
+  const [isConversationSheetOpen, setIsConversationSheetOpen] = useState(false);
 
   const messagesContainerRef = useRef<HTMLElement | null>(null);
   const messageInputRef = useRef<HTMLInputElement | null>(null);
-  const threadIdRef = useRef(createId("thread"));
+  const threadIdRef = useRef<string | null>(null);
   const assistantTextContentRef = useRef("");
   const streamingMessageIdRef = useRef<string | null>(null);
   const hasBootstrappedWelcomeRef = useRef(false);
+  const loadingThreadRef = useRef<string | null>(null);
 
   const placeholder = useMemo(
     () => (isOnline ? "在这里写下下一句对白..." : "后端离线时暂时无法对话"),
@@ -201,6 +248,10 @@ export default function DialogApp() {
 
   const turns = useMemo(() => buildConversationTurns(messages), [messages]);
   const hasConversationTurns = turns.length > 0;
+  const activeConversation = useMemo(
+    () => conversations.find((item) => item.thread_id === activeThreadId) ?? null,
+    [activeThreadId, conversations]
+  );
   const selectedTurn = useMemo(
     () => turns.find((turn) => turn.id === selectedTurnId) ?? null,
     [selectedTurnId, turns]
@@ -212,7 +263,7 @@ export default function DialogApp() {
     pushMessage({
       id: createId("assistant"),
       role: "assistant",
-      content: "今天想和 Roxy 聊哪一段剧情？",
+      content: "今天想和 Roxy 聊些什么？",
       includeInHistory: false,
     });
   };
@@ -222,7 +273,7 @@ export default function DialogApp() {
     if (container) {
       container.scrollTop = container.scrollHeight;
     }
-  }, [showTyping, systemMessages.length, turns.length]);
+  }, [showTyping, systemMessages.length, turns.length, isConversationLoading]);
 
   useEffect(() => {
     if (selectedTurnId && !selectedTurn) {
@@ -236,15 +287,26 @@ export default function DialogApp() {
   }, [selectedTurnId]);
 
   useEffect(() => {
+    if (selectedTurnId) {
+      setIsConversationSheetOpen(false);
+    }
+  }, [selectedTurnId]);
+
+  useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key !== "Escape") return;
+
+      if (selectedTurnId) {
         setSelectedTurnId(null);
+        return;
       }
+
+      setIsConversationSheetOpen(false);
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [selectedTurnId]);
 
   useEffect(() => {
     let disposed = false;
@@ -260,6 +322,33 @@ export default function DialogApp() {
         setIsOnline(true);
         setStatusDetail("后端已连接，Roxy 随时待命");
         bootstrapWelcome();
+
+        try {
+          setIsConversationListLoading(true);
+          const items = sortConversations(await window.electronAPI.fetchConversations());
+          if (disposed) return;
+
+          setConversations(items);
+          const storedThreadId = window.localStorage.getItem(ACTIVE_THREAD_STORAGE_KEY);
+          if (storedThreadId && items.some((item) => item.thread_id === storedThreadId)) {
+            threadIdRef.current = storedThreadId;
+            setActiveThreadId(storedThreadId);
+          } else if (items[0]) {
+            threadIdRef.current = items[0].thread_id;
+            setActiveThreadId(items[0].thread_id);
+            window.localStorage.setItem(ACTIVE_THREAD_STORAGE_KEY, items[0].thread_id);
+          } else {
+            threadIdRef.current = null;
+            setActiveThreadId(null);
+            window.localStorage.removeItem(ACTIVE_THREAD_STORAGE_KEY);
+          }
+        } catch (error) {
+          console.warn("Could not load conversations:", error);
+        } finally {
+          if (!disposed) {
+            setIsConversationListLoading(false);
+          }
+        }
 
         try {
           const models = await window.electronAPI.listModels();
@@ -284,12 +373,61 @@ export default function DialogApp() {
       }
     };
 
-    init();
+    void init();
 
     return () => {
       disposed = true;
     };
   }, []);
+
+  useEffect(() => {
+    const threadId = activeThreadId;
+    if (!threadId || !isOnline) {
+      return;
+    }
+
+    if (loadingThreadRef.current === threadId) {
+      return;
+    }
+
+    let isCancelled = false;
+    loadingThreadRef.current = threadId;
+
+    const loadConversationDetail = async () => {
+      setIsConversationLoading(true);
+      try {
+        const detail = await window.electronAPI.fetchConversation(threadId);
+        if (isCancelled) return;
+
+        setMessages(buildMessagesFromConversation(detail));
+        setConversations((prev) =>
+          upsertConversation(prev, {
+            thread_id: detail.thread_id,
+            title: detail.title,
+            created_at: detail.created_at,
+            updated_at: detail.updated_at,
+            last_message_preview: detail.last_message_preview,
+            message_count: detail.message_count,
+          })
+        );
+      } catch (error) {
+        if (!isCancelled) {
+          console.error("Failed to load conversation detail:", error);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsConversationLoading(false);
+        }
+        loadingThreadRef.current = null;
+      }
+    };
+
+    void loadConversationDetail();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeThreadId, isOnline]);
 
   const getConversationHistory = () =>
     messages
@@ -300,6 +438,36 @@ export default function DialogApp() {
       }))
       .filter((message) => Boolean(message.content))
       .slice(-12);
+
+  const handleSelectConversation = async (threadId: string) => {
+    if (threadId === activeThreadId) {
+      setIsConversationSheetOpen(false);
+      return;
+    }
+
+    setSelectedTurnId(null);
+    threadIdRef.current = threadId;
+    setActiveThreadId(threadId);
+    setIsConversationSheetOpen(false);
+    window.localStorage.setItem(ACTIVE_THREAD_STORAGE_KEY, threadId);
+  };
+
+  const handleCreateConversation = async () => {
+    if (!isOnline || isStreaming) return;
+
+    try {
+      const created = await window.electronAPI.createConversation();
+      setConversations((prev) => upsertConversation(prev, created));
+      setMessages([]);
+      setSelectedTurnId(null);
+      threadIdRef.current = created.thread_id;
+      setActiveThreadId(created.thread_id);
+      setIsConversationSheetOpen(false);
+      window.localStorage.setItem(ACTIVE_THREAD_STORAGE_KEY, created.thread_id);
+    } catch (error) {
+      console.error("Failed to create conversation:", error);
+    }
+  };
 
   const appendAssistantDelta = (delta: string) => {
     const streamMessageId = streamingMessageIdRef.current ?? createId("assistant");
@@ -352,19 +520,61 @@ export default function DialogApp() {
     setTrace(nextTrace);
   };
 
+  const refreshConversationSummary = async (threadId: string, fallbackText: string) => {
+    try {
+      const detail = await window.electronAPI.fetchConversation(threadId);
+      setConversations((prev) =>
+        upsertConversation(prev, {
+          thread_id: detail.thread_id,
+          title: detail.title,
+          created_at: detail.created_at,
+          updated_at: detail.updated_at,
+          last_message_preview: detail.last_message_preview,
+          message_count: detail.message_count,
+        })
+      );
+    } catch (error) {
+      console.error("Failed to refresh conversation summary:", error);
+      setConversations((prev) =>
+        sortConversations(
+          prev.map((item) =>
+            item.thread_id === threadId
+              ? {
+                  ...item,
+                  updated_at: new Date().toISOString(),
+                  last_message_preview: fallbackText.trim() || item.last_message_preview,
+                  message_count: item.message_count + 2,
+                }
+              : item
+          )
+        )
+      );
+    }
+  };
+
   const sendMessage = async (message: string) => {
     if (!message || isStreaming || !isOnline) return;
+
+    const currentThreadId = threadIdRef.current;
+    const previousMessages = currentThreadId
+      ? undefined
+      : messages
+          .filter((item) => item.role === "user" || item.role === "assistant")
+          .map((item) => ({
+            role: item.role,
+            content: item.content,
+          }));
 
     assistantTextContentRef.current = "";
     streamingMessageIdRef.current = null;
     let hasFinalizedAssistantMessage = false;
     setIsStreaming(true);
     setTrace(null);
+    setIsConversationSheetOpen(false);
     window.electronAPI.setDialogChatBusy(true);
 
-    const userMessageId = createId("user");
     pushMessage({
-      id: userMessageId,
+      id: createId("user"),
       role: "user",
       content: message,
     });
@@ -373,8 +583,8 @@ export default function DialogApp() {
     try {
       const events = await window.electronAPI.sendChatStream(
         message,
-        threadIdRef.current,
-        getConversationHistory()
+        currentThreadId || undefined,
+        previousMessages ?? getConversationHistory()
       );
 
       for (const event of Array.isArray(events) ? events : []) {
@@ -400,14 +610,21 @@ export default function DialogApp() {
         }
 
         if (event.type === "done") {
-          if (event.thread_id) {
-            threadIdRef.current = event.thread_id;
+          const resolvedThreadId = event.thread_id || currentThreadId || null;
+          if (resolvedThreadId) {
+            threadIdRef.current = resolvedThreadId;
+            setActiveThreadId(resolvedThreadId);
+            window.localStorage.setItem(ACTIVE_THREAD_STORAGE_KEY, resolvedThreadId);
           }
-          finalizeAssistantMessage(
-            typeof event.text === "string" && event.text ? event.text : assistantTextContentRef.current,
-            event.trace ?? null
-          );
+
+          const finalText =
+            typeof event.text === "string" && event.text ? event.text : assistantTextContentRef.current;
+          finalizeAssistantMessage(finalText, event.trace ?? null);
           hasFinalizedAssistantMessage = true;
+
+          if (resolvedThreadId) {
+            await refreshConversationSummary(resolvedThreadId, finalText);
+          }
           continue;
         }
 
@@ -484,7 +701,40 @@ export default function DialogApp() {
           <img src={roxyBackgroundPng} alt="" />
         </div>
 
+        <div className="session-ribbon">
+          <button
+            type="button"
+            className={`session-ribbon-trigger${isConversationSheetOpen ? " active" : ""}`}
+            onClick={() => {
+              setSelectedTurnId(null);
+              setIsConversationSheetOpen((prev) => !prev);
+            }}
+            aria-expanded={isConversationSheetOpen}
+            aria-controls="conversation-sheet"
+          >
+            <span className="session-ribbon-label">对白记录</span>
+            <span className="session-ribbon-title">{getConversationTitle(activeConversation)}</span>
+            <span className="session-ribbon-meta">
+              {activeConversation ? `${activeConversation.message_count} 条消息` : "未开始新的对白"}
+            </span>
+          </button>
+        </div>
+
         <div className="floating-controls">
+          <button
+            type="button"
+            className={`floating-btn${isConversationSheetOpen ? " active" : ""}`}
+            aria-label="Open conversation history"
+            onClick={() => {
+              setSelectedTurnId(null);
+              setIsConversationSheetOpen((prev) => !prev);
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M8 7h8M8 12h8M8 17h5" strokeLinecap="round" />
+              <path d="M4.5 7h.01M4.5 12h.01M4.5 17h.01" strokeLinecap="round" />
+            </svg>
+          </button>
           <button
             type="button"
             id="close-btn"
@@ -494,6 +744,103 @@ export default function DialogApp() {
           >
             <span />
           </button>
+        </div>
+
+        <div
+          id="conversation-sheet"
+          className={`session-sheet${isConversationSheetOpen ? " visible" : ""}`}
+          aria-hidden={isConversationSheetOpen ? "false" : "true"}
+          onClick={() => setIsConversationSheetOpen(false)}
+        >
+          <div
+            className="session-sheet-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="session-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="overlay-header session-sheet-header">
+              <div>
+                <p id="session-dialog-title" className="overlay-title">
+                  MEMORY LOG
+                </p>
+                <p className="overlay-subtitle session-sheet-title">切换到另一段对白</p>
+              </div>
+              <div className="session-sheet-actions">
+                <button
+                  type="button"
+                  className="session-sheet-new"
+                  disabled={!isOnline || isStreaming}
+                  onClick={() => {
+                    void handleCreateConversation();
+                  }}
+                >
+                  新对白
+                </button>
+                <button
+                  type="button"
+                  className="overlay-close-btn"
+                  aria-label="Close conversation switcher"
+                  onClick={() => setIsConversationSheetOpen(false)}
+                >
+                  <span />
+                </button>
+              </div>
+            </div>
+
+            <div className="overlay-body session-sheet-body">
+              {isConversationListLoading ? (
+                <div className="session-loading-list">
+                  {[0, 1, 2].map((item) => (
+                    <div key={item} className="session-card skeleton" />
+                  ))}
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="session-empty">
+                  <p>这里会保存你和 Roxy 的对白。</p>
+                  <button
+                    type="button"
+                    className="session-empty-cta"
+                    disabled={!isOnline || isStreaming}
+                    onClick={() => {
+                      void handleCreateConversation();
+                    }}
+                  >
+                    开启第一段对白
+                  </button>
+                </div>
+              ) : (
+                <div className="session-list">
+                  {conversations.map((conversation) => {
+                    const isActive = conversation.thread_id === activeThreadId;
+                    return (
+                      <button
+                        key={conversation.thread_id}
+                        type="button"
+                        className={`session-card${isActive ? " active" : ""}`}
+                        disabled={isStreaming}
+                        onClick={() => {
+                          void handleSelectConversation(conversation.thread_id);
+                        }}
+                      >
+                        <div className="session-card-top">
+                          <p className="session-card-title">{getConversationTitle(conversation)}</p>
+                          <span className="session-card-count">{conversation.message_count}</span>
+                        </div>
+                        <p className="session-card-preview">
+                          {conversation.last_message_preview?.trim() || "回到这段对白，继续写下下一句。"}
+                        </p>
+                        <div className="session-card-meta">
+                          <span>{formatRelativeTime(conversation.updated_at)}</span>
+                          <span>{conversation.thread_id.slice(-6)}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <main
@@ -513,6 +860,17 @@ export default function DialogApp() {
           ) : null}
 
           <section className="turns-feed" aria-label="Conversation previews">
+            {isConversationLoading ? (
+              <div className="system-bubble turn-bubble empty">
+                <img src={thinkingSvg} alt="" aria-hidden="true" />
+                <div className="turn-bubble-copy">
+                  <p className="turn-preview">Roxy 正在翻开这段对白的记录...</p>
+                  <div className="turn-meta-row">
+                    <span className="turn-meta">载入会话中</span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {turns.map((turn, index) => (
               <button
                 key={turn.id}
@@ -530,9 +888,7 @@ export default function DialogApp() {
                       {turn.isStreaming ? "对白生成中..." : `第 ${index + 1} 轮对白`}
                     </span>
                     {turn.toolEvents.length > 0 ? (
-                      <span className="turn-tool-pill">
-                        {turn.toolEvents.length} 次 tool call
-                      </span>
+                      <span className="turn-tool-pill">{turn.toolEvents.length} 次 tool call</span>
                     ) : null}
                   </div>
                 </div>
@@ -554,11 +910,7 @@ export default function DialogApp() {
         </div>
 
         <div className={`trace-info${trace ? "" : " hidden"}`}>
-          <span>
-            {trace
-              ? `Steps ${trace.steps} · Tool calls ${trace.tool_calls} · Errors ${trace.errors}`
-              : ""}
-          </span>
+          <span>{trace ? `Steps ${trace.steps} · Tool calls ${trace.tool_calls} · Errors ${trace.errors}` : ""}</span>
         </div>
 
         <footer className="input-panel">
@@ -599,7 +951,13 @@ export default function DialogApp() {
           aria-hidden={selectedTurn ? "false" : "true"}
           onClick={() => setSelectedTurnId(null)}
         >
-          <div className="turn-overlay-content" role="dialog" aria-modal="true" aria-labelledby="turn-dialog-title" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="turn-overlay-content"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="turn-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+          >
             {selectedTurn ? (
               <>
                 <div className="overlay-header">
@@ -655,7 +1013,9 @@ export default function DialogApp() {
                     <div className="answer-panel">
                       <div className="detail-label detail-label-roxy">FINAL ANSWER</div>
                       <div className="detail-text">
-                        {selectedTurn.finalAnswerText || selectedTurn.assistantText || (selectedTurn.isStreaming ? "Roxy 正在继续写下回答..." : "(empty response)")}
+                        {selectedTurn.finalAnswerText ||
+                          selectedTurn.assistantText ||
+                          (selectedTurn.isStreaming ? "Roxy 正在继续写下回答..." : "(empty response)")}
                       </div>
                     </div>
                   </section>
@@ -665,9 +1025,7 @@ export default function DialogApp() {
                       <div className="detail-tools-header">
                         <div>
                           <div className="detail-label detail-label-tools">TOOL CALLS</div>
-                          <p className="detail-tools-summary">
-                            点击展开
-                          </p>
+                          <p className="detail-tools-summary">点击展开</p>
                         </div>
                         <span className="tool-count-badge">{selectedTurn.toolEvents.length}</span>
                       </div>

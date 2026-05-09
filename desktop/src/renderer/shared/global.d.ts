@@ -23,6 +23,24 @@ type ChatStreamEvent =
     }
   | { type: "error"; error?: string };
 
+type ConversationSummary = {
+  thread_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  last_message_preview: string;
+  message_count: number;
+};
+
+type ConversationDetail = ConversationSummary & {
+  messages: Array<{
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    created_at: string;
+  }>;
+};
+
 interface ElectronAPI {
   dragLock: (locked: boolean) => void;
   dragMove: () => void;
@@ -47,6 +65,9 @@ interface ElectronAPI {
     messages?: Array<{ role: "user" | "assistant"; content: string }>
   ) => Promise<unknown>;
   listModels: () => Promise<unknown>;
+  fetchConversations: () => Promise<ConversationSummary[]>;
+  fetchConversation: (threadId: string) => Promise<ConversationDetail>;
+  createConversation: () => Promise<ConversationSummary>;
   healthCheck: () => Promise<boolean>;
 }
 

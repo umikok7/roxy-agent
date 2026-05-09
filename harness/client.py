@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import shutil
 import uuid
 from pathlib import Path
@@ -42,6 +43,8 @@ class HarnessClient:
         self.config = config or load_harness_config(self._project_root)
         self._sandbox_root = self.config.sandbox.root_dir
         self._knowledge_base: KnowledgeBaseService | None = None
+        self._skills_cache_key: tuple[Any, ...] | None = None
+        self._skills_cache_value: list[Skill] | None = None
 
     def _get_knowledge_base(self) -> KnowledgeBaseService:
         if self._knowledge_base is None:
@@ -56,11 +59,17 @@ class HarnessClient:
     ) -> list[Skill]:
         skills_path = self._project_root / "skills"
         extensions_config_path = str(self._project_root / "extensions_config.json")
-        skills = load_skills(
-            skills_path=skills_path,
-            enabled_only=True,
-            extensions_config_path=extensions_config_path,
-        )
+        cache_key = self._build_skills_cache_key(skills_path, Path(extensions_config_path))
+        if self._skills_cache_key == cache_key and self._skills_cache_value is not None:
+            skills = self._skills_cache_value
+        else:
+            skills = load_skills(
+                skills_path=skills_path,
+                enabled_only=True,
+                extensions_config_path=extensions_config_path,
+            )
+            self._skills_cache_key = cache_key
+            self._skills_cache_value = skills
         if sync_to_sandbox:
             self._sync_skills_into_sandbox(skills, thread_paths=thread_paths)
         return skills
@@ -74,11 +83,58 @@ class HarnessClient:
         *,
         thread_paths: ThreadRuntimePaths | None = None,
     ) -> None:
-        sandbox_root = thread_paths.thread_root if thread_paths is not None else self._sandbox_root
+        sandbox_root = self._get_shared_skills_root(thread_paths)
         for item in skills:
-            target_path = sandbox_root / item.get_container_file_path("skills")
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(item.skill_file, target_path)
+            target_dir = sandbox_root / item.category / item.skill_path if item.skill_path else sandbox_root / item.category
+            if self._skill_dir_is_current(item.skill_dir, target_dir):
+                continue
+            target_dir.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(item.skill_dir, target_dir, dirs_exist_ok=True)
+
+    def _build_skills_cache_key(self, skills_path: Path, extensions_config_path: Path) -> tuple[Any, ...]:
+        root = skills_path.resolve()
+        config = extensions_config_path.resolve()
+        snapshot: list[tuple[str, int, int]] = []
+        for category in ("public", "custom"):
+            category_path = root / category
+            if not category_path.exists():
+                continue
+            for current_root, dir_names, file_names in os.walk(category_path):
+                dir_names[:] = sorted(name for name in dir_names if not name.startswith("."))
+                if "SKILL.md" not in file_names:
+                    continue
+                skill_file = Path(current_root) / "SKILL.md"
+                stat = skill_file.stat()
+                snapshot.append((str(skill_file.relative_to(root)), stat.st_mtime_ns, stat.st_size))
+
+        config_snapshot = None
+        if config.exists():
+            stat = config.stat()
+            config_snapshot = (stat.st_mtime_ns, stat.st_size)
+        return str(root), tuple(snapshot), config_snapshot
+
+    def _get_shared_skills_root(self, thread_paths: ThreadRuntimePaths | None) -> Path:
+        if thread_paths is not None:
+            return thread_paths.shared_skills_dir
+        return self._sandbox_root / "users" / "local" / "skills"
+
+    def _skill_dir_is_current(self, source_dir: Path, target_dir: Path) -> bool:
+        source_marker = source_dir / "SKILL.md"
+        target_marker = target_dir / "SKILL.md"
+        if not target_marker.exists():
+            return False
+        return self._directory_mtime_ns(target_dir) >= self._directory_mtime_ns(source_dir) and target_marker.stat().st_size == source_marker.stat().st_size
+
+    def _directory_mtime_ns(self, directory: Path) -> int:
+        latest = 0
+        for current_root, dir_names, file_names in os.walk(directory):
+            dir_names[:] = [name for name in dir_names if not name.startswith(".")]
+            current_path = Path(current_root)
+            latest = max(latest, current_path.stat().st_mtime_ns)
+            for file_name in file_names:
+                file_path = current_path / file_name
+                latest = max(latest, file_path.stat().st_mtime_ns)
+        return latest
 
     def _make_runtime_context(
         self,
@@ -112,6 +168,7 @@ class HarnessClient:
         return BasicSandbox(
             thread_paths.thread_root,
             command_cwd=thread_paths.workspace_dir,
+            allowed_roots=[thread_paths.shared_skills_dir],
             command_timeout_seconds=self.config.sandbox.command_timeout_seconds,
             max_output_chars=self.config.runtime.max_output_chars,
         )

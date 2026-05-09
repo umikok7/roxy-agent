@@ -30,6 +30,7 @@ export interface ChatResponse {
     subagent_calls: number;
     subagent_errors: number;
   };
+  thread_id?: string;
 }
 
 export interface StreamTraceInfo {
@@ -58,4 +59,22 @@ export interface ModelInfo {
   provider: string;
   supports_vision: boolean;
   default: boolean;
+}
+
+export interface ConversationSummary {
+  thread_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  last_message_preview: string;
+  message_count: number;
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: Array<{
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    created_at: string;
+  }>;
 }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from harness.agents.loop import AsyncAgentLoop, ChatCompletionsModelClient, LoopSettings
+from harness.agents.loop import AsyncAgentLoop, ChatCompletionsModelClient, LoopSettings, split_stream_delta
 from harness.models.types import RuntimeContext, ToolCall
 from harness.sandbox.runtime import BasicSandbox
 from harness.tools.executor import ToolExecutor
@@ -165,3 +165,12 @@ async def test_agent_loop_handles_knowledge_search_roundtrip(tmp_path):
     assert result.text == "根据知识库，支持 7 天退款。"
     assert result.trace.steps == 2
     assert result.trace.tool_calls == 1
+
+
+def test_split_stream_delta_breaks_large_chunks():
+    text = "这是一个较长的流式片段，需要被拆成更小的段落。这样看起来才像真正流式输出。"
+    chunks = split_stream_delta(text, chunk_size=10)
+
+    assert len(chunks) > 2
+    assert "".join(chunks) == text
+    assert all(chunk for chunk in chunks)

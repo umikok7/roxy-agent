@@ -42,3 +42,21 @@ def test_sandbox_blocks_sudo_commands(tmp_path):
 
     with pytest.raises(SandboxPermissionError):
         sandbox.run_bash("sudo ls")
+
+
+def test_sandbox_allows_symlinked_shared_skill_dir_with_allowed_root(tmp_path):
+    shared_skills = tmp_path / "shared" / "skills"
+    shared_skills.mkdir(parents=True)
+    (shared_skills / "note.txt").write_text("shared", encoding="utf-8")
+
+    thread_root = tmp_path / "threads" / "t1"
+    thread_root.mkdir(parents=True)
+    (thread_root / "skills").symlink_to(shared_skills, target_is_directory=True)
+
+    sandbox = BasicSandbox(
+        thread_root,
+        command_cwd=thread_root,
+        allowed_roots=[shared_skills],
+    )
+
+    assert sandbox.read_file("skills/note.txt") == "shared"

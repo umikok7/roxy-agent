@@ -89,6 +89,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return response.json();
     },
 
+    fetchConversations: async () => {
+        const response = await fetch(`${API_BASE_URL}/conversations`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    },
+
+    fetchConversation: async (threadId) => {
+        const response = await fetch(`${API_BASE_URL}/conversations/${encodeURIComponent(threadId)}`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    },
+
+    createConversation: async () => {
+        const response = await fetch(`${API_BASE_URL}/conversations/create`, {
+            method: 'POST',
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    },
+
     // Health check
     healthCheck: async () => {
         const response = await fetch(`${API_BASE_URL}/health`);

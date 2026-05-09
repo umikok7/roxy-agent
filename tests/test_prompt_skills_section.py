@@ -23,6 +23,7 @@ def test_get_skills_prompt_section_contains_skill_locations():
     assert "<skill_system>" in section
     assert "<name>example</name>" in section
     assert "<location>skills/public/example/SKILL.md</location>" in section
+    assert "references or scripts in the same folder" in section
 
 
 def test_build_system_instructions_includes_skills_section_when_present():

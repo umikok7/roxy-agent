@@ -122,6 +122,11 @@ body {
   transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
 }
 
+.floating-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 .floating-btn span {
   display: block;
   width: 11px;
@@ -136,13 +141,288 @@ body {
   border-color: rgba(255, 232, 196, 0.24);
 }
 
+.floating-btn.active {
+  background: rgba(28, 36, 80, 0.82);
+  border-color: rgba(255, 224, 170, 0.26);
+}
+
+.session-ribbon {
+  position: absolute;
+  top: 16px;
+  left: 10px;
+  z-index: 4;
+  width: 194px;
+  -webkit-app-region: no-drag;
+}
+
+.session-ribbon-trigger {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 232, 196, 0.12);
+  background: rgba(18, 24, 54, 0.88);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 24px rgba(3, 5, 14, 0.12);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.session-ribbon-trigger:hover,
+.session-ribbon-trigger:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 224, 170, 0.24);
+  background: rgba(22, 30, 67, 0.94);
+  outline: none;
+}
+
+.session-ribbon-trigger.active {
+  border-color: rgba(255, 224, 170, 0.28);
+  background: rgba(22, 30, 67, 0.94);
+}
+
+.session-ribbon-label,
+.session-sheet-kicker {
+  color: rgba(255, 223, 178, 0.52);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+}
+
+.session-ribbon-title {
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-ribbon-meta {
+  display: block;
+  margin-top: 2px;
+  color: rgba(255, 224, 182, 0.62);
+  font-size: 10px;
+}
+
+.session-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow-y: auto;
+  padding: 44px 12px 16px 8px;
+  background: rgba(4, 7, 18, 0.22);
+  backdrop-filter: blur(6px);
+}
+
+.session-sheet.visible {
+  animation: message-in 180ms ease-out;
+}
+
+.session-sheet[aria-hidden="true"] {
+  display: none;
+}
+
+.session-sheet::-webkit-scrollbar {
+  width: 5px;
+}
+
+.session-sheet::-webkit-scrollbar-thumb {
+  background: rgba(255, 232, 196, 0.18);
+  border-radius: 999px;
+}
+
+.session-sheet-panel {
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  max-width: 300px;
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+.session-sheet-header {
+  margin-bottom: 10px;
+}
+
+.session-sheet-title {
+  margin-top: 4px;
+}
+
+.session-sheet-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.session-sheet-new,
+.session-empty-cta {
+  border: 1px solid rgba(255, 232, 196, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, opacity 180ms ease;
+}
+
+.session-sheet-new {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 0 16px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.session-sheet-new:hover:not(:disabled),
+.session-empty-cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 232, 196, 0.2);
+}
+
+.session-sheet-new:disabled,
+.session-empty-cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.session-sheet-body {
+  gap: 10px;
+}
+
+.session-sheet-body::-webkit-scrollbar {
+  width: 5px;
+}
+
+.session-sheet-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 232, 196, 0.16);
+  border-radius: 999px;
+}
+
+.session-list,
+.session-loading-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session-card {
+  width: 100%;
+  margin: 0 10px 0 10px;
+  padding: 12px 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 232, 196, 0.12);
+  background: rgba(11, 15, 34, 0.52);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 12px 24px rgba(3, 5, 14, 0.12);
+  backdrop-filter: blur(10px);
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.session-card:hover,
+.session-card:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 224, 170, 0.24);
+  background: rgba(22, 30, 71, 0.56);
+  box-shadow: 0 18px 30px rgba(3, 5, 14, 0.18);
+  outline: none;
+}
+
+.session-card.active {
+  border-color: rgba(255, 224, 170, 0.18);
+  background: rgba(22, 30, 71, 0.56);
+  box-shadow: 0 18px 30px rgba(3, 5, 14, 0.18);
+}
+
+.session-card.skeleton {
+  min-height: 100px;
+  margin: 0 10px 0 10px;
+  cursor: default;
+  background:
+    linear-gradient(90deg, rgba(22, 30, 71, 0.58), rgba(32, 42, 86, 0.76), rgba(22, 30, 71, 0.58));
+  animation: shimmer 1.6s infinite linear;
+}
+
+.session-card-top,
+.session-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.session-card-title {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-card-count {
+  flex-shrink: 0;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 242, 222, 0.68);
+  font-size: 11px;
+}
+
+.session-card-preview {
+  margin-top: 10px;
+  color: rgba(255, 242, 222, 0.82);
+  font-size: 11px;
+  line-height: 1.75;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.session-card-meta {
+  margin-top: 12px;
+  color: rgba(255, 242, 222, 0.56);
+  font-size: 10px;
+}
+
+.session-empty {
+  margin: 0 10px;
+  padding: 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 232, 196, 0.12);
+  background: rgba(11, 15, 34, 0.52);
+  color: rgba(255, 242, 222, 0.72);
+  font-size: 12px;
+  line-height: 1.7;
+  box-shadow: 0 12px 24px rgba(3, 5, 14, 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.session-empty-cta {
+  margin-top: 10px;
+  padding: 9px 12px;
+  font-size: 11px;
+}
+
 .turns-stage {
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 20px 4px 8px;
+  padding: 92px 4px 8px;
   position: relative;
   z-index: 1;
 }
@@ -842,13 +1122,23 @@ body {
   }
 }
 
+@keyframes shimmer {
+  from {
+    background-position: -160px 0;
+  }
+
+  to {
+    background-position: 160px 0;
+  }
+}
+
 @media (max-width: 480px) {
   .dialog-shell {
     padding: 6px 4px 8px;
   }
 
   .turns-stage {
-    padding: 18px 2px 6px;
+    padding: 90px 2px 6px;
   }
 
   .background-figure {

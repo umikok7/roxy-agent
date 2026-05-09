@@ -11,6 +11,25 @@ from harness.tools.executor import ToolExecutor
 ChatMessage = dict[str, Any]
 
 
+def split_stream_delta(text: str, *, chunk_size: int = 12) -> list[str]:
+    if len(text) <= chunk_size:
+        return [text]
+
+    chunks: list[str] = []
+    current = ""
+    punctuation = {"。", "！", "？", "，", ",", ".", "!", "?", ";", "；", "\n"}
+
+    for char in text:
+        current += char
+        if len(current) >= chunk_size or char in punctuation:
+            chunks.append(current)
+            current = ""
+
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 class ChatCompletionsModelClient(Protocol):
     async def create_response(
         self,
@@ -86,9 +105,10 @@ class OpenAIChatCompletionsClient:
                 content = getattr(delta, "content", None)
                 if content:
                     text_parts.append(content)
-                    maybe_awaitable = on_delta(content)
-                    if maybe_awaitable is not None:
-                        await maybe_awaitable
+                    for piece in split_stream_delta(content):
+                        maybe_awaitable = on_delta(piece)
+                        if maybe_awaitable is not None:
+                            await maybe_awaitable
 
                 delta_tool_calls = getattr(delta, "tool_calls", None) or []
                 for item in delta_tool_calls:

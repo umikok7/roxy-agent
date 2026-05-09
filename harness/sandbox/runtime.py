@@ -33,17 +33,21 @@ class BasicSandbox:
         root_dir: Path,
         *,
         command_cwd: Path | None = None,
+        allowed_roots: list[Path] | None = None,
         command_timeout_seconds: int = 60,
         max_output_chars: int = 12000,
     ) -> None:
         self.root_dir = root_dir.resolve()
         self.command_cwd = (command_cwd or self.root_dir).resolve()
+        self.allowed_roots = [path.resolve() for path in (allowed_roots or [])]
         self.command_timeout_seconds = command_timeout_seconds
         self.max_output_chars = max_output_chars
         if not self.command_cwd.is_relative_to(self.root_dir):
             raise SandboxPermissionError(f"Command cwd is outside sandbox root: {self.command_cwd}")
         self.root_dir.mkdir(parents=True, exist_ok=True)
         self.command_cwd.mkdir(parents=True, exist_ok=True)
+        for path in self.allowed_roots:
+            path.mkdir(parents=True, exist_ok=True)
 
     def _truncate(self, text: str) -> str:
         if len(text) <= self.max_output_chars:
@@ -58,9 +62,14 @@ class BasicSandbox:
         else:
             resolved = (base / target).resolve()
 
-        if not resolved.is_relative_to(base):
+        if not self._is_allowed_path(resolved):
             raise SandboxPermissionError(f"Path is outside sandbox root: {user_path}")
         return resolved
+
+    def _is_allowed_path(self, path: Path) -> bool:
+        if path.is_relative_to(self.root_dir):
+            return True
+        return any(path.is_relative_to(allowed_root) for allowed_root in self.allowed_roots)
 
     def _guard_command(self, command: str) -> None:
         normalized = command.strip()

@@ -26,6 +26,35 @@ class TraceInfo(BaseModel):
 class ChatResponse(BaseModel):
     text: str
     trace: TraceInfo
+    thread_id: str | None = None
+
+
+class ConversationMessage(BaseModel):
+    id: str
+    role: str
+    content: str
+    created_at: str
+
+
+class ConversationSummary(BaseModel):
+    thread_id: str
+    title: str
+    created_at: str
+    updated_at: str
+    last_message_preview: str
+    message_count: int
+
+
+class ConversationDetail(ConversationSummary):
+    messages: list[ConversationMessage]
+
+
+class ConversationCreateResponse(ConversationSummary):
+    pass
+
+
+class ConversationRenameRequest(BaseModel):
+    title: str
 
 
 class ModelInfo(BaseModel):

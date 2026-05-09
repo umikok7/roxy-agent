@@ -1,6 +1,13 @@
-import { ChatRequest, ChatResponse, ModelInfo, StreamTraceInfo } from "@/types/chat";
+import {
+  ChatRequest,
+  ChatResponse,
+  ConversationDetail,
+  ConversationSummary,
+  ModelInfo,
+  StreamTraceInfo,
+} from "@/types/chat";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 export async function sendMessage(request: ChatRequest): Promise<ChatResponse> {
   const response = await fetch(`${API_BASE_URL}/chat`, {
@@ -32,6 +39,16 @@ interface StreamHandlers {
   }) => void;
   onDone?: (payload: { text: string; trace: StreamTraceInfo; thread_id?: string }) => void;
   onError?: (error: string) => void;
+}
+
+async function yieldToBrowser(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(() => resolve());
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
 }
 
 export async function sendMessageStream(request: ChatRequest, handlers: StreamHandlers): Promise<void> {
@@ -109,6 +126,7 @@ export async function sendMessageStream(request: ChatRequest, handlers: StreamHa
         handlers.onStart?.();
       } else if (event.type === "delta" && typeof event.delta === "string") {
         handlers.onDelta(event.delta);
+        await yieldToBrowser();
       } else if (
         (event.type === "task_started" ||
           event.type === "task_running" ||
@@ -138,6 +156,32 @@ export async function sendMessageStream(request: ChatRequest, handlers: StreamHa
 
 export async function fetchModels(): Promise<ModelInfo[]> {
   const response = await fetch(`${API_BASE_URL}/models`);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function fetchConversations(): Promise<ConversationSummary[]> {
+  const response = await fetch(`${API_BASE_URL}/conversations`);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function fetchConversation(threadId: string): Promise<ConversationDetail> {
+  const response = await fetch(`${API_BASE_URL}/conversations/${encodeURIComponent(threadId)}`);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function createConversation(): Promise<ConversationSummary> {
+  const response = await fetch(`${API_BASE_URL}/conversations/create`, {
+    method: "POST",
+  });
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }

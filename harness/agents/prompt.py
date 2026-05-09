@@ -27,9 +27,11 @@ def get_skills_prompt_section(skills: list[Skill], *, container_base_path: str =
     )
     return (
         "<skill_system>\n"
-        "You have access to skills that provide optimized workflows for specific tasks.\n"
+        "You have access to skills that provide optimized workflows for specific tasks. "
+        "Each skill may include additional files such as references or scripts in the same folder.\n"
         "When a user's request matches a skill, call read_file on the skill location first, "
-        "then follow the instructions from that skill file.\n\n"
+        "then follow the instructions from that skill file.\n"
+        "Load referenced files from the same skill directory only when needed during execution.\n\n"
         "<available_skills>\n"
         f"{skill_items}\n"
         "</available_skills>\n"
