@@ -77,6 +77,7 @@ class AgentTrace:
 class AgentRunResult:
     text: str
     trace: AgentTrace = field(default_factory=AgentTrace)
+    thread_id: str | None = None
 
 
 @dataclass(slots=True)

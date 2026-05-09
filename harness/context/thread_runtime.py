@@ -19,6 +19,8 @@ class ThreadRuntimePaths:
     uploads_dir: Path
     outputs_dir: Path
     context_file: Path
+    conversation_file: Path
+    messages_file: Path
 
 
 class ThreadRuntimeResolver:
@@ -38,6 +40,8 @@ class ThreadRuntimeResolver:
             uploads_dir=thread_root / "uploads",
             outputs_dir=thread_root / "outputs",
             context_file=thread_root / "context.json",
+            conversation_file=thread_root / "conversation.json",
+            messages_file=thread_root / "messages.json",
         )
 
     def ensure_dirs(self, paths: ThreadRuntimePaths) -> ThreadRuntimePaths:

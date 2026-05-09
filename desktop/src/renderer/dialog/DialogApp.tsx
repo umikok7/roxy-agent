@@ -212,7 +212,7 @@ export default function DialogApp() {
     pushMessage({
       id: createId("assistant"),
       role: "assistant",
-      content: "今天想和 Roxy 聊哪一段剧情？",
+      content: "今天想和 Roxy 聊哪什么？",
       includeInHistory: false,
     });
   };
