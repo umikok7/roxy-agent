@@ -112,6 +112,8 @@ MINIMAX_API_KEY=your_api_key_here
 HARNESS_DEFAULT_MODEL=minimax-m2.7
 HARNESS_SANDBOX_ROOT=.sandbox
 HARNESS_MAX_STEPS=8
+HARNESS_LOCAL_BROWSER_ENABLED=true
+HARNESS_LOCAL_BROWSER_SEARCH_ENGINE=https://www.bing.com/search?q={query}
 ```
 
 ## 项目架构
@@ -159,7 +161,7 @@ result = await loop.run(messages, max_steps=8)
 
 ### ToolRegistry (`harness/tools/registry.py`)
 
-可扩展的工具注册表，默认注册 6 个工具：
+可扩展的工具注册表，默认注册 9 个工具：
 
 | 工具 | 功能 |
 |------|------|
@@ -168,6 +170,8 @@ result = await loop.run(messages, max_steps=8)
 | `read_file` | 读取文件 |
 | `write_file` | 写入文件 |
 | `str_replace` | 原地编辑文件 |
+| `browser_search` | 打开本地默认浏览器并发起搜索 |
+| `browser_open` | 在本地默认浏览器中打开指定网页 |
 | `web_search` | 网页搜索 |
 
 ### BasicSandbox (`harness/sandbox/runtime.py`)

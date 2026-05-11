@@ -11,10 +11,19 @@ import {
 import roxyVrmUrl from "../../../assets/roxy_3D/roxi.vrm?url";
 import thinkingVrmaUrl from "../../../assets/roxy_3D/vrma/Thinking.vrma?url";
 import lookAroundVrmaUrl from "../../../assets/roxy_3D/vrma/LookAround.vrma?url";
+import RelaxVrmaUrl from "../../../assets/roxy_3D/vrma/Relax.vrma?url";
+import AngryVrmaUrl from "../../../assets/roxy_3D/vrma/Angry.vrma?url";
+import BlushVrmaUrl from "../../../assets/roxy_3D/vrma/Blush.vrma?url";
+import ClappingVrmaUrl from "../../../assets/roxy_3D/vrma/Clapping.vrma?url";
+import SleepyVrmaUrl from "../../../assets/roxy_3D/vrma/Sleepy.vrma?url";
+import SadVrmaUrl from "../../../assets/roxy_3D/vrma/Sad.vrma?url";
+import JumpVrmaUrl from "../../../assets/roxy_3D/vrma/Jump.vrma?url";
+import SurprisedVrmaUrl from "../../../assets/roxy_3D/vrma/Surprised.vrma?url";
+import GoodbyeVrmaUrl from "../../../assets/roxy_3D/vrma/Goodbye.vrma?url";
 
 type PetVisualState = "thinking" | "lookAround";
 
-type VrmaActionKey = "thinking" | "lookAround";
+type VrmaActionKey = "thinking" | "lookAround" | "random";
 
 type LoadedVrm = {
   scene: THREE.Object3D;
@@ -29,6 +38,19 @@ type ActionPlaybackMode = "loop" | "hold";
 const VRMA_ACTIONS: Record<VrmaActionKey, { url: string; label: string }> = {
   thinking: { url: thinkingVrmaUrl, label: "Thinking" },
   lookAround: { url: lookAroundVrmaUrl, label: "LookAround" },
+  random: { url: "", label: "Random" },
+};
+
+const VRMA_RANDOM_ACTIONS: Record<string, { url: string; label: string }> = {
+  relax: { url: RelaxVrmaUrl, label: "Relax" },
+  angry: { url: AngryVrmaUrl, label: "Angry" },
+  blush: { url: BlushVrmaUrl, label: "Blush" },
+  clapping: { url: ClappingVrmaUrl, label: "Clapping" },
+  sleepy: { url: SleepyVrmaUrl, label: "Sleepy" },
+  sad: { url: SadVrmaUrl, label: "Sad" },
+  jump: { url: JumpVrmaUrl, label: "Jump" },
+  surprised: { url: SurprisedVrmaUrl, label: "Surprised" },
+  goodbye: { url: GoodbyeVrmaUrl, label: "Goodbye" },
 };
 
 function damp(current: number, target: number, lambda: number, delta: number) {
@@ -205,6 +227,35 @@ export default function PetApp() {
       activateAction(state, state === "thinking" ? "loop" : "hold");
     });
 
+    const unsubscribeRandomAction = window.electronAPI.onPlayRandomAction((actionKey, assetUrl) => {
+      console.log('[PetApp] onPlayRandomAction received:', actionKey, assetUrl);
+      if (!actionKey || !assetUrl || !vrm || !mixer) {
+        console.log('[PetApp] early return: vrm=', !!vrm, 'mixer=', !!mixer);
+        return;
+      }
+      const vrmaLoader = new GLTFLoader();
+      vrmaLoader.register((parser: any) => new VRMAnimationLoaderPlugin(parser));
+      loadVrmaClip(vrmaLoader, vrm, assetUrl).then((clip) => {
+        console.log('[PetApp] clip loaded, creating action');
+        if (disposed || !mixer) return;
+        const tempAction = mixer.clipAction(clip);
+        tempAction.clampWhenFinished = false;
+        tempAction.loop = THREE.LoopOnce;
+        tempAction.repetitions = 1;
+        tempAction.play();
+        // After action finishes, revert to lookAround
+        const onFinished = () => {
+          console.log('[PetApp] action finished, reverting to lookAround');
+          tempAction.stop();
+          activateAction("lookAround", "hold");
+          mixer?.removeEventListener("finished", onFinished);
+        };
+        mixer?.addEventListener("finished", onFinished);
+      }).catch((err) => {
+        console.error("[PetApp] Failed to load random action:", err);
+      });
+    });
+
     const applyStateAnimation = (delta: number, elapsed: number) => {
       if (!vrm) return;
 
@@ -279,7 +330,8 @@ export default function PetApp() {
         const vrmaLoader = new GLTFLoader();
         vrmaLoader.register((parser: any) => new VRMAnimationLoaderPlugin(parser));
 
-        const entries = Object.entries(VRMA_ACTIONS) as [VrmaActionKey, { url: string; label: string }][];
+        const entries = (Object.entries(VRMA_ACTIONS) as [VrmaActionKey, { url: string; label: string }][])
+            .filter(([key]) => key !== "random");
         await Promise.all(
           entries.map(async ([key, entry]) => {
             const clip = await loadVrmaClip(vrmaLoader, vrm, entry.url);
@@ -307,6 +359,7 @@ export default function PetApp() {
     return () => {
       disposed = true;
       unsubscribeStateChange();
+      unsubscribeRandomAction?.();
       window.removeEventListener("resize", handleResize);
       window.cancelAnimationFrame(frameId);
       mixer?.stopAllAction();

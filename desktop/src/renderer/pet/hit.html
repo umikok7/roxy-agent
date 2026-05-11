@@ -113,17 +113,33 @@
             pointerId = null;
         }
 
+        function handleDoubleClick() {
+            window.electronAPI.openChatDialog();
+        }
+
+        function handleSingleClick() {
+            console.log('[hit.html] handleSingleClick called');
+            window.electronAPI.getRandomAction().then((action) => {
+                console.log('[hit.html] getRandomAction result:', action);
+                if (action) {
+                    console.log('[hit.html] calling playRandomAction');
+                    window.electronAPI.playRandomAction(action.key, action.url);
+                }
+            });
+        }
+
         function handleClick() {
             clickCount += 1;
 
             if (clickCount === 2) {
                 clearPendingClick();
-                window.electronAPI.openChatDialog();
+                handleDoubleClick();
                 return;
             }
 
             clickTimer = setTimeout(() => {
                 clearPendingClick();
+                handleSingleClick();
             }, DOUBLE_CLICK_MS);
         }
 

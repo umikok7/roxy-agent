@@ -57,12 +57,20 @@ class MemoryConfig:
 
 
 @dataclass(slots=True)
+class LocalBrowserConfig:
+    enabled: bool = True
+    search_engine: str = "https://www.bing.com/search?q={query}"
+    allowed_domains: tuple[str, ...] = ()
+
+
+@dataclass(slots=True)
 class HarnessConfig:
     models: list[RegisteredModel]
     default_model: str
     sandbox: SandboxConfig
     runtime: RuntimeConfig
     memory: MemoryConfig
+    local_browser: LocalBrowserConfig
     rag: RagConfig
 
     def get_model(self, model_name: str | None = None) -> RegisteredModel:
@@ -113,6 +121,13 @@ def load_harness_config(project_root: Path | None = None) -> HarnessConfig:
     memory_fact_confidence_threshold = float(os.getenv("HARNESS_MEMORY_FACT_CONFIDENCE_THRESHOLD", "0.7"))
     memory_injection_enabled = os.getenv("HARNESS_MEMORY_INJECTION_ENABLED", "true").lower() == "true"
     memory_max_injection_tokens = int(os.getenv("HARNESS_MEMORY_MAX_INJECTION_TOKENS", "1200"))
+    local_browser_enabled = os.getenv("HARNESS_LOCAL_BROWSER_ENABLED", "true").lower() == "true"
+    local_browser_search_engine = (
+        os.getenv("HARNESS_LOCAL_BROWSER_SEARCH_ENGINE", "https://www.bing.com/search?q={query}").strip()
+        or "https://www.bing.com/search?q={query}"
+    )
+    raw_allowed_domains = os.getenv("HARNESS_LOCAL_BROWSER_ALLOWED_DOMAINS", "")
+    local_browser_allowed_domains = tuple(item.strip() for item in raw_allowed_domains.split(",") if item.strip())
 
     raw_memory_path = Path(memory_storage_path)
     resolved_memory_path = raw_memory_path if raw_memory_path.is_absolute() else (root / raw_memory_path).resolve()
@@ -142,6 +157,11 @@ def load_harness_config(project_root: Path | None = None) -> HarnessConfig:
             fact_confidence_threshold=max(0.0, min(1.0, memory_fact_confidence_threshold)),
             injection_enabled=memory_injection_enabled,
             max_injection_tokens=max(100, memory_max_injection_tokens),
+        ),
+        local_browser=LocalBrowserConfig(
+            enabled=local_browser_enabled,
+            search_engine=local_browser_search_engine,
+            allowed_domains=local_browser_allowed_domains,
         ),
         rag=load_rag_config(root),
     )

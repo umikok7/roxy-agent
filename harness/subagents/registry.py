@@ -31,7 +31,7 @@ BASH_SUBAGENT = SubagentConfig(
         "- Never call the task tool."
     ),
     tools=["bash", "ls", "read_file", "write_file", "str_replace"],
-    disallowed_tools=["task", "web_search"],
+    disallowed_tools=["task", "web_search", "browser_search", "browser_open"],
     model="inherit",
     max_steps=6,
 )

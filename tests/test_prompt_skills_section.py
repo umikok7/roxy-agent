@@ -39,7 +39,7 @@ def test_build_system_instructions_includes_skills_section_when_present():
     )
 
     instructions = build_system_instructions([skill])
-    assert "You are a minimal coding agent" in instructions
+    assert "You are a local desktop assistant" in instructions
     assert "<available_skills>" in instructions
 
 
@@ -48,3 +48,18 @@ def test_build_system_instructions_includes_long_term_memory_when_present():
 
     assert "<long_term_memory>" in instructions
     assert "Prefers concise replies" in instructions
+
+
+def test_build_system_instructions_includes_browser_tool_governance():
+    instructions = build_system_instructions([])
+
+    assert "browser_search is for opening the host browser to search on the user's machine" in instructions
+    assert "browser_search and browser_open only perform local browser actions" in instructions
+    assert "Do not say that a browser page was opened unless the corresponding browser tool call actually succeeded." in instructions
+
+
+def test_build_system_instructions_preserves_pinned_skill_priority():
+    instructions = build_system_instructions([], pinned_skills=["roxy-skill"])
+
+    assert "Previously selected skills in this session: roxy-skill." in instructions
+    assert "Do not let the base assistant tone override the pinned skill's persona." in instructions

@@ -17,6 +17,7 @@ from harness.subagents import (
     get_subagent_config,
 )
 from harness.rag.service import KnowledgeBaseService
+from harness.tools.local_browser import LocalBrowserClient
 from harness.tools.web_search import WebSearchClient
 
 
@@ -80,11 +81,14 @@ class ToolRegistry:
         sandbox: BasicSandbox,
         *,
         web_search_client: WebSearchClient | None = None,
+        local_browser_client: LocalBrowserClient | None = None,
+        local_browser_enabled: bool = True,
         knowledge_base: KnowledgeBaseService | None = None,
         include_task_tool: bool = False,
     ) -> "ToolRegistry":
         registry = cls()
         search_client = web_search_client or WebSearchClient()
+        browser_client = local_browser_client or LocalBrowserClient(enabled=local_browser_enabled)
 
         async def bash_tool(runtime: ToolRuntime, args: dict[str, Any]) -> str:
             command = str(args.get("command", ""))
@@ -117,6 +121,15 @@ class ToolRegistry:
             query = str(args.get("query", ""))
             max_results = int(args.get("max_results", 5))
             return await asyncio.to_thread(lambda: search_client.search(query, max_results=max_results))
+
+        async def browser_search_tool(runtime: ToolRuntime, args: dict[str, Any]) -> str:
+            query = str(args.get("query", ""))
+            open_result = bool(args.get("open_result", False))
+            return await asyncio.to_thread(lambda: browser_client.search(query, open_result=open_result))
+
+        async def browser_open_tool(runtime: ToolRuntime, args: dict[str, Any]) -> str:
+            url = str(args.get("url", ""))
+            return await asyncio.to_thread(browser_client.open_url, url)
 
         async def knowledge_search_tool(runtime: ToolRuntime, args: dict[str, Any]) -> str:
             service = runtime.context.knowledge_base or knowledge_base
@@ -208,6 +221,46 @@ class ToolRegistry:
             ),
             str_replace_tool,
         )
+        if local_browser_enabled:
+            registry.register(
+                ToolSpec(
+                    name="browser_search",
+                    description=(
+                        "Open the local default browser with a search query. "
+                        "Use this when the user explicitly wants the browser to open and search on the host machine. "
+                        "This opens a search results page only; it does not read the webpage content back."
+                    ),
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string", "description": "Search query to open in the local browser."},
+                            "open_result": {
+                                "type": "boolean",
+                                "description": "Reserved for future direct-result behavior. The current implementation still opens the search results page.",
+                            },
+                        },
+                        "required": ["query"],
+                    },
+                ),
+                browser_search_tool,
+            )
+            registry.register(
+                ToolSpec(
+                    name="browser_open",
+                    description=(
+                        "Open an http or https URL in the local default browser. "
+                        "Use this only for host-side browser actions; this tool does not fetch or summarize page contents."
+                    ),
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string", "description": "http or https URL to open in the local browser."},
+                        },
+                        "required": ["url"],
+                    },
+                ),
+                browser_open_tool,
+            )
         registry.register(
             ToolSpec(
                 name="knowledge_search",

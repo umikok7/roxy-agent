@@ -25,6 +25,7 @@ from harness.subagents import (
     get_subagent_config,
 )
 from harness.tools.executor import ToolExecutor
+from harness.tools.local_browser import LocalBrowserClient
 from harness.tools.registry import ToolRegistry, ToolRuntime
 
 
@@ -343,6 +344,12 @@ class HarnessClient:
         include_task_tool = effective_subagent_enabled and subagent_depth == 0
         registry = ToolRegistry.with_default_tools(
             sandbox,
+            local_browser_client=LocalBrowserClient(
+                enabled=self.config.local_browser.enabled,
+                search_engine_template=self.config.local_browser.search_engine,
+                allowed_domains=self.config.local_browser.allowed_domains,
+            ),
+            local_browser_enabled=self.config.local_browser.enabled,
             knowledge_base=knowledge_base,
             include_task_tool=include_task_tool,
         )

@@ -23,6 +23,40 @@ const STATE_TO_SVG = {
     lookAround: 'roxy-idle.svg',
 };
 
+const VRMA_ACTION_URLS = [
+    'Relax',
+    'Angry',
+    'Blush',
+    'Clapping',
+    'Sleepy',
+    'Sad',
+    'Jump',
+    'Surprised',
+    'Goodbye',
+].map(name => {
+    const relativePath = path.join('..', '..', 'assets', 'roxy_3D', 'vrma', `${name}.vrma`);
+    return {
+        key: name.toLowerCase(),
+        relativePath,
+        absolutePath: path.join(__dirname, relativePath),
+        label: name,
+    };
+});
+
+let lastRandomActionKey = null;
+
+function getRandomVrmaAction() {
+    const available = VRMA_ACTION_URLS.filter(a => a.key !== lastRandomActionKey);
+    if (available.length === 0) return VRMA_ACTION_URLS[0];
+    const selected = available[Math.floor(Math.random() * available.length)];
+    lastRandomActionKey = selected.key;
+    return {
+        key: selected.key,
+        label: selected.label,
+        url: pathToFileURL(selected.absolutePath).href,
+    };
+}
+
 const CLAUDE_HOOK_EVENTS = [
     'SessionStart',
     'SessionEnd',
@@ -875,6 +909,27 @@ ipcMain.on('dialog-chat-busy', (_event, active) => {
 
 ipcMain.on('play-voice-key', (_event, voiceKey) => {
     emitVoiceKey(voiceKey);
+});
+
+ipcMain.on('play-random-action', (_event, actionKey, assetUrl) => {
+    log.info(`[DEBUG] play-random-action received in main: key=${actionKey}`);
+    if (!petWindow || petWindow.isDestroyed()) {
+        log.info('[DEBUG] petWindow is null/destroyed');
+        return;
+    }
+    log.info(`[DEBUG] petWindow exists, sending to webContents. webContents.isLoading()=`);
+    try {
+        petWindow.webContents.send('play-random-action', actionKey, assetUrl);
+        log.info('[DEBUG] send() called successfully');
+    } catch (e) {
+        log.error('[DEBUG] send() failed:', e.message);
+    }
+});
+
+ipcMain.handle('get-random-action', () => {
+    const action = getRandomVrmaAction();
+    log.info(`[DEBUG] get-random-action returning: ${JSON.stringify(action)}`);
+    return action;
 });
 
 app.whenReady().then(() => {

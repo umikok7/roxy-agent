@@ -6,6 +6,7 @@ from harness.agents.loop import AsyncAgentLoop, ChatCompletionsModelClient, Loop
 from harness.models.types import RuntimeContext, ToolCall
 from harness.sandbox.runtime import BasicSandbox
 from harness.tools.executor import ToolExecutor
+from harness.tools.local_browser import LocalBrowserClient
 from harness.tools.registry import ToolRegistry, ToolRuntime
 
 
@@ -99,6 +100,61 @@ class FakeResponsesClientWithKnowledgeSearch(ChatCompletionsModelClient):
         return ("根据知识库，支持 7 天退款。", [])
 
 
+class FakeLocalBrowserClient(LocalBrowserClient):
+    def search(self, query: str, *, open_result: bool = False) -> str:
+        return f"action=browser_search\nok=true\nopened=true\nurl=https://example.com/search?q={query}\nmessage=Opened"
+
+
+class FakeResponsesClientWithBrowserSearch(ChatCompletionsModelClient):
+    def __init__(self):
+        self.calls = 0
+
+    async def create_response(
+        self,
+        *,
+        model,
+        messages,
+        tools,
+        temperature=None,
+        max_tokens=None,
+        on_delta=None,
+    ):
+        self.calls += 1
+        if self.calls == 1:
+            assert any(item["function"]["name"] == "browser_search" for item in tools)
+            return ("", [ToolCall(id="call_browser", name="browser_search", arguments={"query": "roxy"})])
+        assert messages[-1]["role"] == "tool"
+        assert messages[-1]["tool_call_id"] == "call_browser"
+        assert "action=browser_search" in messages[-1]["content"]
+        return ("已经在本地浏览器里打开搜索结果。", [])
+
+
+class FakeResponsesClientWithHallucinatedBrowserAction(ChatCompletionsModelClient):
+    def __init__(self):
+        self.calls = 0
+
+    async def create_response(
+        self,
+        *,
+        model,
+        messages,
+        tools,
+        temperature=None,
+        max_tokens=None,
+        on_delta=None,
+    ):
+        self.calls += 1
+        if self.calls == 1:
+            return ("browser_search - 已经帮你打开浏览器搜索洛琪希。", [])
+        if self.calls == 2:
+            assert messages[-1]["role"] == "user"
+            assert "Tool-use correction" in messages[-1]["content"]
+            return ("", [ToolCall(id="call_browser_retry", name="browser_search", arguments={"query": "洛琪希"})])
+        assert messages[-1]["role"] == "tool"
+        assert messages[-1]["tool_call_id"] == "call_browser_retry"
+        return ("这次已经真正打开浏览器搜索洛琪希了。", [])
+
+
 @pytest.mark.asyncio
 async def test_agent_loop_handles_tool_use_roundtrip(tmp_path):
     sandbox = BasicSandbox(tmp_path)
@@ -164,6 +220,48 @@ async def test_agent_loop_handles_knowledge_search_roundtrip(tmp_path):
 
     assert result.text == "根据知识库，支持 7 天退款。"
     assert result.trace.steps == 2
+    assert result.trace.tool_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_handles_browser_search_roundtrip(tmp_path):
+    sandbox = BasicSandbox(tmp_path)
+    registry = ToolRegistry.with_default_tools(sandbox, local_browser_client=FakeLocalBrowserClient())
+    executor = ToolExecutor(registry, ToolRuntime(sandbox=sandbox, context=RuntimeContext()))
+
+    loop = AsyncAgentLoop(
+        model_client=FakeResponsesClientWithBrowserSearch(),
+        tool_executor=executor,
+        tool_schemas=registry.list_tool_schemas(),
+        settings=LoopSettings(model="fake", max_steps=4),
+        instructions="test",
+    )
+
+    result = await loop.run("帮我打开浏览器搜索 roxy")
+
+    assert result.text == "已经在本地浏览器里打开搜索结果。"
+    assert result.trace.steps == 2
+    assert result.trace.tool_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_retries_when_browser_action_was_only_claimed_in_text(tmp_path):
+    sandbox = BasicSandbox(tmp_path)
+    registry = ToolRegistry.with_default_tools(sandbox, local_browser_client=FakeLocalBrowserClient())
+    executor = ToolExecutor(registry, ToolRuntime(sandbox=sandbox, context=RuntimeContext()))
+
+    loop = AsyncAgentLoop(
+        model_client=FakeResponsesClientWithHallucinatedBrowserAction(),
+        tool_executor=executor,
+        tool_schemas=registry.list_tool_schemas(),
+        settings=LoopSettings(model="fake", max_steps=4),
+        instructions="test",
+    )
+
+    result = await loop.run("打开浏览器搜索一下洛琪希")
+
+    assert result.text == "这次已经真正打开浏览器搜索洛琪希了。"
+    assert result.trace.steps == 3
     assert result.trace.tool_calls == 1
 
 

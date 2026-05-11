@@ -194,6 +194,53 @@ class AsyncAgentLoop:
         self.instructions = instructions
         self.max_concurrent_subagents = max(1, max_concurrent_subagents)
 
+    def _has_tool(self, name: str) -> bool:
+        return any(item.get("function", {}).get("name") == name for item in self.tool_schemas)
+
+    @staticmethod
+    def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
+        lowered = text.lower()
+        return any(pattern in lowered for pattern in patterns)
+
+    def _should_retry_browser_tool_use(self, user_prompt: str, assistant_text: str, *, already_retried: bool) -> bool:
+        if already_retried:
+            return False
+        if not self._has_tool("browser_search") and not self._has_tool("browser_open"):
+            return False
+
+        prompt_text = user_prompt.strip()
+        assistant_output = assistant_text.strip()
+        if not prompt_text or not assistant_output:
+            return False
+
+        browser_request_patterns = (
+            "打开浏览器",
+            "浏览器",
+            "open browser",
+            "launch browser",
+            "open the browser",
+            "open webpage",
+            "打开网页",
+            "打开页面",
+            "search in browser",
+            "browser search",
+        )
+        if not self._contains_any(prompt_text, browser_request_patterns):
+            return False
+
+        false_action_patterns = (
+            "browser_search",
+            "browser_open",
+            "浏览器已打开",
+            "已打开搜索页面",
+            "已打开浏览器",
+            "搜索页面已打开",
+            "opened browser",
+            "opened the browser",
+            "opened search",
+        )
+        return self._contains_any(assistant_output, false_action_patterns)
+
     def _truncate_subagent_calls(self, tool_calls: list[ToolCall]) -> tuple[list[ToolCall], int]:
         task_indices = [index for index, call in enumerate(tool_calls) if call.name == "task"]
         if len(task_indices) <= self.max_concurrent_subagents:
@@ -255,6 +302,7 @@ class AsyncAgentLoop:
             messages.extend(self._normalize_history(history_messages))
         messages.append({"role": "user", "content": user_prompt})
         final_text = ""
+        browser_retry_used = False
 
         for _ in range(self.settings.max_steps):
             trace.steps += 1
@@ -290,6 +338,19 @@ class AsyncAgentLoop:
             messages.append(assistant_message)
 
             if not tool_calls:
+                if self._should_retry_browser_tool_use(user_prompt, final_text or text or "", already_retried=browser_retry_used):
+                    browser_retry_used = True
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": (
+                                "Tool-use correction: you have not executed the browser action yet. "
+                                "If you intend to open or search in the host browser, call browser_search or browser_open now. "
+                                "Do not claim success without a real tool call."
+                            ),
+                        }
+                    )
+                    continue
                 return AgentRunResult(text=final_text or "(empty response)", trace=trace)
 
             trace.tool_calls += len(tool_calls)
