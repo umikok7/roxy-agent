@@ -105,6 +105,11 @@ const VOICE_CLIP_FILES = {
     hard_failure_a: 'hard_failure_a.wav',
 };
 
+const EXTERNAL_COMPLETION_EVENTS = {
+    success: new Set(['Stop', 'event_msg:task_complete']),
+    failure: new Set(['Stop', 'turn_aborted', 'event_msg:turn_aborted']),
+};
+
 let petWindow = null;
 let hitWindow = null;
 let dialogWindow = null;
@@ -122,6 +127,8 @@ let transientStateTimer = null;
 let sleepCheckTimer = null;
 let dialogChatBusy = false;
 const externalSessions = new Map();
+const voiceRotationState = new Map();
+const externalCompletionCooldown = new Map();
 
 function getSvgAssetPath(fileName) {
     return path.join(__dirname, '..', '..', 'assets', 'roxy', fileName);
@@ -152,6 +159,69 @@ function sendToRenderer(channel, ...args) {
     if (petWindow && !petWindow.isDestroyed()) {
         petWindow.webContents.send(channel, ...args);
     }
+}
+
+function selectRotatingVoiceKey(voiceKeys) {
+    if (!Array.isArray(voiceKeys) || voiceKeys.length === 0) {
+        return null;
+    }
+    if (voiceKeys.length === 1) {
+        return voiceKeys[0];
+    }
+    const groupKey = voiceKeys.join('|');
+    const currentIndex = voiceRotationState.get(groupKey) || 0;
+    const selected = voiceKeys[currentIndex % voiceKeys.length];
+    voiceRotationState.set(groupKey, (currentIndex + 1) % voiceKeys.length);
+    return selected;
+}
+
+function emitVoiceKey(voiceKey) {
+    if (!petWindow || petWindow.isDestroyed() || typeof voiceKey !== 'string' || !voiceKey.trim()) {
+        return false;
+    }
+    const normalizedVoiceKey = voiceKey.trim();
+    const voicePath = getVoiceAssetPath(normalizedVoiceKey);
+    if (!voicePath || !fs.existsSync(voicePath)) {
+        log.warn(`Voice asset not found for key: ${normalizedVoiceKey}`);
+        return false;
+    }
+
+    const payload = {
+        voiceKey: normalizedVoiceKey,
+        assetUrl: pathToFileURL(voicePath).href,
+    };
+    log.info(`Forwarding voice asset to pet window: ${normalizedVoiceKey}`);
+    petWindow.webContents.send('play-voice-asset', payload);
+    return true;
+}
+
+function playVoiceForTaskCompletion(status) {
+    if (status === 'failure') {
+        emitVoiceKey('hard_failure_a');
+        return;
+    }
+    const voiceKey = selectRotatingVoiceKey(['success_light_a', 'success_light_b']);
+    if (voiceKey) {
+        emitVoiceKey(voiceKey);
+    }
+}
+
+function maybeAnnounceExternalCompletion({ sessionId, event, outcome }) {
+    if (!sessionId || !outcome) return;
+    const normalizedOutcome = outcome === 'failure' ? 'failure' : 'success';
+    const allowedEvents = EXTERNAL_COMPLETION_EVENTS[normalizedOutcome];
+    if (allowedEvents && event && !allowedEvents.has(event)) {
+        return;
+    }
+
+    const cooldownKey = `${sessionId}:${normalizedOutcome}`;
+    const now = Date.now();
+    const lastAt = externalCompletionCooldown.get(cooldownKey) || 0;
+    if (now - lastAt < 1500) {
+        return;
+    }
+    externalCompletionCooldown.set(cooldownKey, now);
+    playVoiceForTaskCompletion(normalizedOutcome);
 }
 
 function reapplyMacVisibility(targetWindow, options = {}) {
@@ -396,8 +466,25 @@ function handleIncomingStateEvent(body) {
     const event = typeof body.event === 'string' ? body.event : '';
     const agentId = typeof body.agent_id === 'string' ? body.agent_id : 'external';
 
+    if (body.state === 'SessionEnd' || body.state === 'Stop') {
+        upsertExternalSession(sessionId, null, { event, agentId });
+        return;
+    }
+
     if (body.state === 'thinking') {
         upsertExternalSession(sessionId, 'thinking', { event, agentId });
+        return;
+    }
+
+    if (body.state === 'task-success') {
+        maybeAnnounceExternalCompletion({ sessionId, event, outcome: 'success' });
+        upsertExternalSession(sessionId, null, { event, agentId });
+        return;
+    }
+
+    if (body.state === 'task-failure') {
+        maybeAnnounceExternalCompletion({ sessionId, event, outcome: 'failure' });
+        upsertExternalSession(sessionId, null, { event, agentId });
         return;
     }
 
@@ -409,8 +496,6 @@ function handleIncomingStateEvent(body) {
     const mappedState = normalizeExternalState(body.state);
     if (mappedState === 'thinking') {
         upsertExternalSession(sessionId, mappedState, { event, agentId });
-    } else {
-        upsertExternalSession(sessionId, null, { event, agentId });
     }
 }
 
@@ -570,6 +655,16 @@ function startCodexMonitor() {
     try {
         const CodexLogMonitor = require('./codex-log-monitor');
         codexMonitor = new CodexLogMonitor(CODEX_AGENT_CONFIG, (sessionId, state, event) => {
+            if (state === 'task-success') {
+                maybeAnnounceExternalCompletion({ sessionId, event, outcome: 'success' });
+                upsertExternalSession(sessionId, null, { event, agentId: 'codex' });
+                return;
+            }
+            if (state === 'task-failure') {
+                maybeAnnounceExternalCompletion({ sessionId, event, outcome: 'failure' });
+                upsertExternalSession(sessionId, null, { event, agentId: 'codex' });
+                return;
+            }
             const mappedState = normalizeExternalState(state);
             if (mappedState === 'thinking') {
                 upsertExternalSession(sessionId, 'thinking', { event, agentId: 'codex' });
@@ -637,6 +732,7 @@ function createHitWindow() {
         resizable: false,
         hasShadow: false,
         focusable: !isMac,
+        backgroundColor: '#00000000',
         webPreferences: {
             preload: path.join(__dirname, '..', 'preload', 'preload.js'),
             contextIsolation: true,
@@ -778,20 +874,7 @@ ipcMain.on('dialog-chat-busy', (_event, active) => {
 });
 
 ipcMain.on('play-voice-key', (_event, voiceKey) => {
-    if (!petWindow || petWindow.isDestroyed() || typeof voiceKey !== 'string' || !voiceKey.trim()) {
-        return;
-    }
-    const voicePath = getVoiceAssetPath(voiceKey.trim());
-    if (!voicePath || !fs.existsSync(voicePath)) {
-        log.warn(`Voice asset not found for key: ${voiceKey}`);
-        return;
-    }
-    const payload = {
-        voiceKey: voiceKey.trim(),
-        assetUrl: pathToFileURL(voicePath).href,
-    };
-    log.info(`Forwarding voice asset to pet window: ${voiceKey}`);
-    petWindow.webContents.send('play-voice-asset', payload);
+    emitVoiceKey(voiceKey);
 });
 
 app.whenReady().then(() => {

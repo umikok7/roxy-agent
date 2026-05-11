@@ -14,12 +14,29 @@ My Deer Flow is a modular AI Agent runtime engine with:
 
 ## Commands
 
+### Full Stack (using Make)
+```bash
+# First-time setup (installs all dependencies)
+make bootstrap
+
+# Start all services (qdrant + backend + frontend + desktop)
+make up
+
+# Check status and health
+make status
+make health
+
+# View logs
+make logs SERVICE=backend
+make down
+```
+
 ### Backend
 ```bash
 # Install dependencies
 uv sync
 
-# Run backend (from project root)
+# Run backend
 cd APP && uvicorn main:app --reload
 
 # Run tests
@@ -36,6 +53,13 @@ npm install
 npm run dev
 npm run build
 npm run lint
+```
+
+### Desktop Client
+```bash
+cd desktop
+npm install
+npm run dev
 ```
 
 ## Architecture
@@ -55,6 +79,7 @@ npm run lint
 - `harness/sandbox/runtime.py`: `BasicSandbox` enforces path boundaries and blocks dangerous commands (rm -rf, sudo, shutdown, etc.)
 - `harness/context/thread_store.py`: Thread-level JSON context persistence
 - `harness/skills/loader.py`: Loads skills from `skills/{public,custom}/*/SKILL.md`
+- `harness/client.py`: `HarnessClient` assembles the runtime: `BasicSandbox + ToolRegistry + ToolExecutor + OpenAIChatCompletionsClient + AsyncAgentLoop`
 
 ### Configuration
 Environment variables (defined in `harness/config/settings.py`):
