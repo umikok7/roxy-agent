@@ -114,18 +114,11 @@
         }
 
         function handleDoubleClick() {
-            window.electronAPI.openChatDialog();
+            window.electronAPI.notifyPetInteraction('double');
         }
 
         function handleSingleClick() {
-            console.log('[hit.html] handleSingleClick called');
-            window.electronAPI.getRandomAction().then((action) => {
-                console.log('[hit.html] getRandomAction result:', action);
-                if (action) {
-                    console.log('[hit.html] calling playRandomAction');
-                    window.electronAPI.playRandomAction(action.key, action.url);
-                }
-            });
+            window.electronAPI.notifyPetInteraction('single');
         }
 
         function handleClick() {

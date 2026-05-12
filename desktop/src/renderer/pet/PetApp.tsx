@@ -35,6 +35,10 @@ type LoadedVrm = {
 
 type ActionPlaybackMode = "loop" | "hold";
 
+function isPetVisualState(state: string): state is PetVisualState {
+  return state === "thinking" || state === "lookAround";
+}
+
 const VRMA_ACTIONS: Record<VrmaActionKey, { url: string; label: string }> = {
   thinking: { url: thinkingVrmaUrl, label: "Thinking" },
   lookAround: { url: lookAroundVrmaUrl, label: "LookAround" },
@@ -223,6 +227,9 @@ export default function PetApp() {
     };
 
     const unsubscribeStateChange = window.electronAPI.onStateChange((state) => {
+      if (!isPetVisualState(state)) {
+        return;
+      }
       stateRef.current = state;
       activateAction(state, state === "thinking" ? "loop" : "hold");
     });
@@ -332,9 +339,10 @@ export default function PetApp() {
 
         const entries = (Object.entries(VRMA_ACTIONS) as [VrmaActionKey, { url: string; label: string }][])
             .filter(([key]) => key !== "random");
+        const loadedVrm = vrm;
         await Promise.all(
           entries.map(async ([key, entry]) => {
-            const clip = await loadVrmaClip(vrmaLoader, vrm, entry.url);
+            const clip = await loadVrmaClip(vrmaLoader, loadedVrm, entry.url);
             if (disposed || !mixer) return;
             const nextAction = mixer.clipAction(clip);
             nextAction.clampWhenFinished = false;

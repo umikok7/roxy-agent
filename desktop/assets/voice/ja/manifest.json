@@ -2,6 +2,46 @@
   "locale": "ja",
   "clips": [
     {
+      "voice_key": "intro_first_open",
+      "text": "初めまして私の名前はロキシーミグルディアと申します"
+    },
+    {
+      "voice_key": "dialog_open_a",
+      "text": "お話なら、いつでも聞きます。どうぞ開いてください。"
+    },
+    {
+      "voice_key": "single_click_bother_a",
+      "text": "そんなにつつかないでください。私だって困ります。"
+    },
+    {
+      "voice_key": "single_click_lazy_a",
+      "text": "ただ怠けたいだけなら、少し怒りますよ。"
+    },
+    {
+      "voice_key": "single_click_focus_a",
+      "text": "集中してください。今はぼんやりしている場合ではありません。"
+    },
+    {
+      "voice_key": "single_click_hydrate_a",
+      "text": "お水でも飲んでください。補給も訓練の一部です。"
+    },
+    {
+      "voice_key": "single_click_help_a",
+      "text": "ロキシーはここにいます。何かお手伝いできることはありますか。"
+    },
+    {
+      "voice_key": "single_click_command_a",
+      "text": "指示をください。ただし、あまり無茶なお願いはお断りします。"
+    },
+    {
+      "voice_key": "single_click_spell_joke_a",
+      "text": "豪雷積層雲……なんて、冗談です。まだあれを使うほどではありません。"
+    },
+    {
+      "voice_key": "single_click_no_chant_a",
+      "text": "この程度のことなら、詠唱するまでもありません。"
+    },
+    {
       "voice_key": "success_light_a",
       "text": "今回もお手伝いできました。"
     },

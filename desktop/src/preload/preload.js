@@ -34,13 +34,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     dragEnd: () => ipcRenderer.send('drag-end'),
     startDragReaction: () => ipcRenderer.send('start-drag-reaction'),
     endDragReaction: () => ipcRenderer.send('end-drag-reaction'),
+    notifyPetInteraction: (type) => ipcRenderer.send('pet-interaction', type),
     openChatDialog: () => ipcRenderer.send('open-chat-dialog'),
     closeDialog: () => ipcRenderer.send('close-dialog'),
     minimizeDialog: () => ipcRenderer.send('minimize-dialog'),
     setDialogChatBusy: (active) => ipcRenderer.send('dialog-chat-busy', active),
     notifyDialogInputFocus: () => ipcRenderer.send('dialog-input-focus'),
     notifyDialogInputBlur: () => ipcRenderer.send('dialog-input-blur'),
-    onStateChange: (callback) => ipcRenderer.on('state-change', (_event, state, svgPath) => callback(state, svgPath)),
+    onStateChange: (callback) => {
+        const listener = (_event, state, svgPath) => callback(state, svgPath);
+        ipcRenderer.on('state-change', listener);
+        return () => ipcRenderer.removeListener('state-change', listener);
+    },
     onPlayVoiceAsset: (callback) => {
         const listener = (_event, payload) => callback(payload);
         ipcRenderer.on('play-voice-asset', listener);
@@ -64,8 +69,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('play-random-action', listener);
         return () => ipcRenderer.removeListener('play-random-action', listener);
     },
-    openChatDialog: () => ipcRenderer.send('open-chat-dialog'),
-
     // Chat streaming - parsed in preload so the renderer never receives a raw Response object
     sendChatStream: async (message, threadId, messages) => {
         const response = await fetch(`${API_BASE_URL}/chat/stream`, {

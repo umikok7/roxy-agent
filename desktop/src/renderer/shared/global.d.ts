@@ -48,21 +48,33 @@ type VoiceAssetPayload = {
   assetUrl: string;
 };
 
+type RandomActionPayload = {
+  key: string;
+  url: string;
+  label: string;
+};
+
 interface ElectronAPI {
   dragLock: (locked: boolean) => void;
   dragMove: () => void;
   dragEnd: () => void;
   startDragReaction: () => void;
   endDragReaction: () => void;
+  notifyPetInteraction: (type: "single" | "double") => void;
   openChatDialog: () => void;
   closeDialog: () => void;
   minimizeDialog: () => void;
   setDialogChatBusy: (active: boolean) => void;
   notifyDialogInputFocus: () => void;
   notifyDialogInputBlur: () => void;
-  onStateChange: (callback: (state: PetState, svgPath: string) => void) => void;
+  onStateChange: (callback: (state: PetState, svgPath: string) => void) => () => void;
   onPlayVoiceAsset: (callback: (payload: VoiceAssetPayload) => void) => () => void;
   playVoiceKey: (voiceKey: string) => void;
+  playRandomAction: (actionKey: string, assetUrl: string) => void;
+  getRandomAction: () => Promise<RandomActionPayload | null>;
+  onPlayRandomAction: (
+    callback: (actionKey: string, assetUrl: string) => void
+  ) => () => void;
   sendChatStream: (
     message: string,
     threadId?: string,

@@ -129,6 +129,16 @@ const CODEX_AGENT_CONFIG = {
 };
 
 const VOICE_CLIP_FILES = {
+    intro_first_open: 'intro_first_open.wav',
+    dialog_open_a: 'dialog_open_a.wav',
+    single_click_bother_a: 'single_click_bother_a.wav',
+    single_click_lazy_a: 'single_click_lazy_a.wav',
+    single_click_focus_a: 'single_click_focus_a.wav',
+    single_click_hydrate_a: 'single_click_hydrate_a.wav',
+    single_click_help_a: 'single_click_help_a.wav',
+    single_click_command_a: 'single_click_command_a.wav',
+    single_click_spell_joke_a: 'single_click_spell_joke_a.wav',
+    single_click_no_chant_a: 'single_click_no_chant_a.wav',
     success_light_a: 'success_light_a.wav',
     success_light_b: 'success_light_b.wav',
     success_normal_a: 'success_normal_a.wav',
@@ -143,6 +153,17 @@ const EXTERNAL_COMPLETION_EVENTS = {
     success: new Set(['Stop', 'event_msg:task_complete']),
     failure: new Set(['Stop', 'turn_aborted', 'event_msg:turn_aborted']),
 };
+
+const SINGLE_CLICK_VOICE_KEYS = [
+    'single_click_bother_a',
+    'single_click_lazy_a',
+    'single_click_focus_a',
+    'single_click_hydrate_a',
+    'single_click_help_a',
+    'single_click_command_a',
+    'single_click_spell_joke_a',
+    'single_click_no_chant_a',
+];
 
 let petWindow = null;
 let hitWindow = null;
@@ -160,6 +181,7 @@ let lastDragAt = Date.now();
 let transientStateTimer = null;
 let sleepCheckTimer = null;
 let dialogChatBusy = false;
+let hasPlayedIntroVoice = false;
 const externalSessions = new Map();
 const voiceRotationState = new Map();
 const externalCompletionCooldown = new Map();
@@ -209,6 +231,23 @@ function selectRotatingVoiceKey(voiceKeys) {
     return selected;
 }
 
+function selectRandomVoiceKey(voiceKeys) {
+    if (!Array.isArray(voiceKeys) || voiceKeys.length === 0) {
+        return null;
+    }
+    if (voiceKeys.length === 1) {
+        return voiceKeys[0];
+    }
+
+    const groupKey = `random:${voiceKeys.join('|')}`;
+    const previous = voiceRotationState.get(groupKey) || null;
+    const available = voiceKeys.filter((voiceKey) => voiceKey !== previous);
+    const pool = available.length > 0 ? available : voiceKeys;
+    const selected = pool[Math.floor(Math.random() * pool.length)];
+    voiceRotationState.set(groupKey, selected);
+    return selected;
+}
+
 function emitVoiceKey(voiceKey) {
     if (!petWindow || petWindow.isDestroyed() || typeof voiceKey !== 'string' || !voiceKey.trim()) {
         return false;
@@ -227,6 +266,41 @@ function emitVoiceKey(voiceKey) {
     log.info(`Forwarding voice asset to pet window: ${normalizedVoiceKey}`);
     petWindow.webContents.send('play-voice-asset', payload);
     return true;
+}
+
+function playRandomPetAction() {
+    const action = getRandomVrmaAction();
+    if (!action || !petWindow || petWindow.isDestroyed()) {
+        return false;
+    }
+    try {
+        petWindow.webContents.send('play-random-action', action.key, action.url);
+        return true;
+    } catch (error) {
+        log.error(`[pet-interaction] failed to send random action: ${error.message}`);
+        return false;
+    }
+}
+
+function handlePetInteraction(interactionType) {
+    if (interactionType === 'single') {
+        const voiceKey = selectRandomVoiceKey(SINGLE_CLICK_VOICE_KEYS);
+        if (voiceKey) {
+            emitVoiceKey(voiceKey);
+        }
+        playRandomPetAction();
+        return;
+    }
+
+    if (interactionType === 'double') {
+        createDialogWindow();
+        if (hasPlayedIntroVoice) {
+            emitVoiceKey('dialog_open_a');
+            return;
+        }
+        hasPlayedIntroVoice = true;
+        emitVoiceKey('intro_first_open');
+    }
 }
 
 function playVoiceForTaskCompletion(status) {
@@ -909,6 +983,14 @@ ipcMain.on('dialog-chat-busy', (_event, active) => {
 
 ipcMain.on('play-voice-key', (_event, voiceKey) => {
     emitVoiceKey(voiceKey);
+});
+
+ipcMain.on('pet-interaction', (_event, interactionType) => {
+    if (interactionType !== 'single' && interactionType !== 'double') {
+        log.warn(`[pet-interaction] unsupported interaction type: ${interactionType}`);
+        return;
+    }
+    handlePetInteraction(interactionType);
 });
 
 ipcMain.on('play-random-action', (_event, actionKey, assetUrl) => {
