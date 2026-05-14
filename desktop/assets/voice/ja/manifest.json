@@ -55,7 +55,7 @@
     },
     {
       "voice_key": "success_normal_b",
-      "text": "必要な作業は整いました。どうぞご確認ください。"
+      "text": "必要な作業は整いました。どうぞをご確認ください。"
     },
     {
       "voice_key": "success_heavy_a",
@@ -71,7 +71,11 @@
     },
     {
       "voice_key": "hard_failure_a",
-      "text": "申し訳ありません。今回はそのまま完了できませんでした。"
+      "text": "申し訳ありません今回はそのまま完了できませんでした。"
+    },
+    {
+      "voice_key": "reminder_start_simple_a",
+      "text": "焦らないで。まずは一番簡単なところから始めましょう。"
     }
   ]
 }

@@ -15,29 +15,25 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 
-WORKSPACE_ROOT = Path("/Users/umikok7/Desktop/python/my-deer-flow")
-DEPLOY_ROOT = WORKSPACE_ROOT / "artifacts" / "gpt-sovits-roxy"
+# ── Path setup ────────────────────────────────────────────────────────────────
+# WORKSPACE_ROOT is derived from the script location (two levels up from this file)
+WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent
+DEPLOY_ROOT = Path(os.environ["ROXY_GSV_DEPLOY_ROOT"]) if "ROXY_GSV_DEPLOY_ROOT" in os.environ else WORKSPACE_ROOT / "artifacts" / "gpt-sovits-roxy"
 GPT_SOVITS_ROOT = DEPLOY_ROOT / "GPT-SoVITS"
 OUTPUT_ROOT = DEPLOY_ROOT / "outputs"
 
-DEFAULT_T2S_WEIGHTS = Path(
-    os.environ.get(
-        "ROXY_GSV_T2S_WEIGHTS",
-        "/Users/umikok7/Downloads/洛琪希GSV模型260426/RoxyPro（新版）/Roxy_Pro.ckpt",
-    )
-)
-DEFAULT_VITS_WEIGHTS = Path(
-    os.environ.get(
-        "ROXY_GSV_VITS_WEIGHTS",
-        "/Users/umikok7/Downloads/洛琪希GSV模型260426/RoxyPro（新版）/Roxy_Pro.pth",
-    )
-)
-DEFAULT_REF_AUDIO = Path(
-    os.environ.get(
-        "ROXY_GSV_REF_AUDIO",
-        "/Users/umikok7/Downloads/洛琪希GSV模型260426/RoxyPro（新版）/slicer_opt/おはようございます、ルディ。その….wav",
-    )
-)
+# ── Model / audio config (env-driven, no hardcoded fallbacks) ───────────────
+def _get_weights(key: str, label: str) -> Path:
+    path = Path(os.environ[key])
+    if not path.exists():
+        raise RuntimeError(f"{label} not found: {path} (set {key} env var)")
+    return path
+
+
+DEFAULT_T2S_WEIGHTS = _get_weights("ROXY_GSV_T2S_WEIGHTS", "T2S weights")
+DEFAULT_VITS_WEIGHTS = _get_weights("ROXY_GSV_VITS_WEIGHTS", "VITS weights")
+DEFAULT_REF_AUDIO = _get_weights("ROXY_GSV_REF_AUDIO", "Reference audio")
+
 DEFAULT_PROMPT_LANG = os.environ.get("ROXY_GSV_PROMPT_LANG", "ja")
 DEFAULT_TEXT_LANG = os.environ.get("ROXY_GSV_TEXT_LANG", "zh")
 DEFAULT_HOST = os.environ.get("ROXY_GSV_HOST", "127.0.0.1")
@@ -55,9 +51,6 @@ def _require_path(path: Path, label: str) -> Path:
 
 
 _require_path(GPT_SOVITS_ROOT, "GPT-SoVITS root")
-_require_path(DEFAULT_T2S_WEIGHTS, "T2S weights")
-_require_path(DEFAULT_VITS_WEIGHTS, "VITS weights")
-_require_path(DEFAULT_REF_AUDIO, "Reference audio")
 
 os.chdir(GPT_SOVITS_ROOT)
 sys.path.insert(0, str(GPT_SOVITS_ROOT))

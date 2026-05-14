@@ -36,6 +36,34 @@
 |----------------------------|------------------------------------|
 | ![idle.png](docs/idle.png) | ![thinking.png](docs/thinking.png) |
 
+## Voice Preview — 语音预览
+
+
+Roxy-Agent 内置了 **多段Roxy的AI语音**，由本地 GPT-SoVITS TTS 服务驱动，以下是语音对照表：
+
+| 场景 | 日文 | 中文 | 播放 |
+|------|------|------|------|
+| 首次打开 | 初めまして私の名前はロキシーミグルディアと申します | 初次见面，我是洛琪希·米格迪亚 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/intro_first_open.wav" type="audio/wav"></audio> |
+| 对话打开 | お話なら、いつでも聞きます。どうぞ開いてください。 | 如果您有话想说，我随时都愿意倾听。请打开吧。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/dialog_open_a.wav" type="audio/wav"></audio> |
+| 单击-被打扰 | そんなにつつかないでください。私だって困ります。 | 别再戳我了。我也会为难的。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/single_click_bother_a.wav" type="audio/wav"></audio> |
+| 单击-偷懒 | ただ怠けたいだけなら、少し怒りますよ。 | 如果只是想偷懒的话，我可要生气了哦。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/single_click_lazy_a.wav" type="audio/wav"></audio> |
+| 单击-专注 | 集中してください。今はぼんやりしている場合ではありません。 | 请专心。现在可不是发呆的时候。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/single_click_focus_a.wav" type="audio/wav"></audio> |
+| 单击-喝水 | お水でも飲んでください。補給も訓練の一部です。 | 去喝点水吧。补充水分也是训练的一部分。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/single_click_hydrate_a.wav" type="audio/wav"></audio> |
+| 单击-帮助 | ロキシーはここにいます。何かお手伝いできることはありますか。 | 洛琪希在这里。有什么我能帮您的吗？ | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/single_click_help_a.wav" type="audio/wav"></audio> |
+| 单击-命令 | 指示をください。ただし、あまり無茶なお願いはお断りします。 | 请给我指示。但太过分的要求我可是会拒绝的。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/single_click_command_a.wav" type="audio/wav"></audio> |
+| 单击-法术玩笑 | 豪雷積層雲……なんて、冗談です。まだあれを使うほどではありません。 | 豪雷积层云……开玩笑的。还没到需要用那个的时候。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/single_click_spell_joke_a.wav" type="audio/wav"></audio> |
+| 单击-不需咏唱 | この程度のことなら、詠唱するまでもありません。 | 这种程度的事，根本用不着咏唱。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/single_click_no_chant_a.wav" type="audio/wav"></audio> |
+| 成功-轻松 A | 今回もお手伝いできました。 | 这次也能帮上忙了。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/success_light_a.wav" type="audio/wav"></audio> |
+| 成功-轻松 B | ひとまずうまくまとまりました。 | 暂且顺利完成了。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/success_light_b.wav" type="audio/wav"></audio> |
+| 成功-普通 A | 対応は無事に完了しました。ご確認ください。 | 处理已顺利完成。请确认一下。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/success_normal_a.wav" type="audio/wav"></audio> |
+| 成功-普通 B | 必要な作業は整いました。どうぞをご確認ください。 | 必要的作业已准备就绪。请过目。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/success_normal_b.wav" type="audio/wav"></audio> |
+| 成功-复杂 A | 少し込み入っていましたが、対応は完了しています。 | 虽然有些复杂，但处理已完成了。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/success_heavy_a.wav" type="audio/wav"></audio> |
+| 成功-复杂 B | いくつか手順を進めましたが、無事にまとまりました。 | 推进了几个步骤，但顺利完成了。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/success_heavy_b.wav" type="audio/wav"></audio> |
+| 部分问题 | 対応は進みましたが、いくつか確認事項が残っています。 | 处理已有进展，但还有几项待确认。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/partial_issue_a.wav" type="audio/wav"></audio> |
+| 严重失败 | 申し訳ありません今回はそのまま完了できませんでした。 | 非常抱歉。这次无法直接完成。 | <audio controls style="height:24px"><source src="desktop/assets/voice/ja/hard_failure_a.wav" type="audio/wav"></audio> |
+
+---
+
 ## Why It Feels Different
 
 | 能力层 | 现在已经有的内容 |
@@ -58,12 +86,6 @@
 
 ## Media Stack
 
-### Pixel Pet Layer
-
-- 资源目录：`desktop/assets/roxy/`
-- 当前内置 idle、thinking、working、sleeping、drag reaction 等像素状态资源
-- 适合常驻桌面、轻量反馈、通知提醒与低功耗展示
-
 ### 3D Pet Layer
 
 - 主模型：`desktop/assets/roxy_3D/roxi.vrm`
@@ -79,6 +101,16 @@
 - 使用说明：`docs/roxy-gsv-local-tts.md`
 - 桌宠语音素材：`desktop/assets/voice/ja/`
 - Electron 主进程已经具备语音事件转发与播放能力
+
+启动前需配置 4 个环境变量（见 `docs/roxy-gsv-local-tts.md`）：
+
+```bash
+export ROXY_GSV_DEPLOY_ROOT=/path/to/gpt-sovits-roxy
+export ROXY_GSV_T2S_WEIGHTS=/path/to/YourChar.ckpt
+export ROXY_GSV_VITS_WEIGHTS=/path/to/YourChar.pth
+export ROXY_GSV_REF_AUDIO=/path/to/reference.wav
+scripts/tts/run_roxy_gsv_service.sh
+```
 
 这意味着这个项目现在已经不只是一个聊天壳子，而是正在把这五层能力汇成同一个角色：
 
@@ -176,82 +208,60 @@ HARNESS_LOCAL_BROWSER_ENABLED=true
 HARNESS_LOCAL_BROWSER_SEARCH_ENGINE=https://www.bing.com/search?q={query}
 ```
 
-## 项目架构
+---
+
+### 自定义你的角色语音
+
+如果你想换掉洛琪希的声线，改成自己的角色或声音，只需要三步：
+
+#### 1. 准备模型权重
+
+把你训练好的 GPT-SoVITS 模型权重放到本地任意目录：
 
 ```
-my-deer-flow/
-├── desktop/               # Electron 桌面客户端
-│   ├── assets/roxy/       # Roxy 像素资源
-│   └── src/               # 客户端源码
-│
-├── harness/               # Agent 运行时引擎核心
-│   ├── agents/            # AsyncAgentLoop 异步执行循环
-│   ├── tools/             # 工具注册与执行 (ToolRegistry, ToolExecutor)
-│   ├── sandbox/           # BasicSandbox 权限隔离
-│   ├── context/            # ThreadContext 线程级上下文
-│   ├── skills/            # SkillsLoader 技能加载
-│   └── models/            # 数据结构定义
-│
-├── APP/                   # FastAPI 应用层
-│   ├── api/               # API 路由 (/chat, /chat/stream)
-│   ├── dto/               # 数据传输对象
-│   └── service/            # ChatService 业务逻辑
-│
-├── frontend/              # Next.js Web 界面（可选）
-├── skills/               # 技能系统
-│   ├── public/           # 内置公共技能
-│   └── custom/            # 自定义技能（如 roxy-skill）
-│
-└── tests/                 # 测试文件
+your-path/
+├── YourChar.ckpt   # GPT 权重
+└── YourChar.pth    # VITS 权重
 ```
 
+#### 2. 设置环境变量
 
-## 核心模块
+在启动 TTS 服务前，设置以下环境变量指向你的权重路径：
 
-### AsyncAgentLoop (`harness/agents/loop.py`)
-
-异步 Agent 执行循环，支持多步 Tool-Call 迭代。
-
-```python
-from harness.agents.loop import AsyncAgentLoop
-
-loop = AsyncAgentLoop(client=chat_client, executor=tool_executor)
-result = await loop.run(messages, max_steps=8)
+```bash
+export ROXY_GSV_T2S_WEIGHTS=/path/to/YourChar.ckpt
+export ROXY_GSV_VITS_WEIGHTS=/path/to/YourChar.pth
+export ROXY_GSV_REF_AUDIO=/path/to/your-reference.wav
 ```
 
-### ToolRegistry (`harness/tools/registry.py`)
+#### 3. 准备参考音频（可选，用于保留音色特色）
 
-可扩展的工具注册表，默认注册 9 个工具：
+```bash
+curl -X POST http://127.0.0.1:9881/tts \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "text": "你好，这是我的新声音。",
+    "text_lang": "zh",
+    "ref_audio_path": "/path/to/your-reference.wav",
+    "prompt_text": "参考音频对应的原文",
+    "prompt_lang": "ja"
+  }'
+```
 
-| 工具 | 功能 |
+#### 常用参数说明
+
+| 参数 | 说明 |
 |------|------|
-| `bash` | 执行 Bash 命令 |
-| `ls` | 列出目录内容 |
-| `read_file` | 读取文件 |
-| `write_file` | 写入文件 |
-| `str_replace` | 原地编辑文件 |
-| `browser_search` | 打开本地默认浏览器并发起搜索 |
-| `browser_open` | 在本地默认浏览器中打开指定网页 |
-| `knowledge_search` | 搜索本地知识库与上传资料 |
-| `web_search` | 网页搜索 |
+| `text` | 要转语音的文本 |
+| `text_lang` | 文本语种（`ja` / `zh` / `en`） |
+| `ref_audio_path` | 参考音频路径（留空用默认） |
+| `prompt_text` | 参考音频对应的原文 |
+| `prompt_lang` | 参考音频语种 |
+| `speed_factor` | 语速（默认 1.0） |
 
-### BasicSandbox (`harness/sandbox/runtime.py`)
+生成后的 WAV 文件可以直接放到 `desktop/assets/voice/ja/` 下，然后在 `manifest.json` 中注册即可。
 
-安全执行环境，强制：
-- 路径边界限制（禁止访问 `.sandbox` 外部）
-- 危险命令过滤（`rm -rf`, `sudo`, `shutdown` 等）
-
-### Skills 系统
-
-技能是 Markdown 文件，位于 `skills/{public,custom}/*/SKILL.md`，通过 `extensions_config.json` 启用/禁用。
-
-```
-skills/
-├── public/        # 内置技能
-└── custom/        # 自定义技能
-    └── roxy-skill/
-        └── SKILL.md
-```
+---
 
 ## 自定义你的桌宠
 

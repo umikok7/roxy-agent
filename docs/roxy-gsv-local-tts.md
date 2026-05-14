@@ -9,23 +9,41 @@
 
 ## 目录
 
-- 部署根目录：`/Users/umikok7/Desktop/python/my-deer-flow/artifacts/gpt-sovits-roxy`
-- 服务脚本：`/Users/umikok7/Desktop/python/my-deer-flow/scripts/tts/roxy_gsv_service.py`
-- 启动脚本：`/Users/umikok7/Desktop/python/my-deer-flow/scripts/tts/run_roxy_gsv_service.sh`
-- 默认输出目录：`/Users/umikok7/Desktop/python/my-deer-flow/artifacts/gpt-sovits-roxy/outputs`
+- 部署根目录：`/path/to/gpt-sovits-roxy`（通过 `ROXY_GSV_DEPLOY_ROOT` 环境变量指定）
+- 服务脚本：`scripts/tts/roxy_gsv_service.py`
+- 启动脚本：`scripts/tts/run_roxy_gsv_service.sh`
+- 默认输出目录：`${ROXY_GSV_DEPLOY_ROOT}/outputs`
 
-## 当前默认模型
+## 必需的环境变量
 
-- GPT 权重：`/Users/umikok7/Downloads/洛琪希GSV模型260426/RoxyPro（新版）/Roxy_Pro.ckpt`
-- SoVITS 权重：`/Users/umikok7/Downloads/洛琪希GSV模型260426/RoxyPro（新版）/Roxy_Pro.pth`
-- 默认参考音频：`/Users/umikok7/Downloads/洛琪希GSV模型260426/RoxyPro（新版）/slicer_opt/おはようございます、ルディ。その….wav`
-- 默认参考语种：`ja`
-- 默认输出语种：`zh`
+启动服务前必须设置以下环境变量：
+
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `ROXY_GSV_DEPLOY_ROOT` | GPT-SoVITS 部署根目录 | `/Users/umikok7/Desktop/python/my-deer-flow/artifacts/gpt-sovits-roxy` |
+| `ROXY_GSV_T2S_WEIGHTS` | GPT 权重路径 | `/path/to/YourChar.ckpt` |
+| `ROXY_GSV_VITS_WEIGHTS` | VITS 权重路径 | `/path/to/YourChar.pth` |
+| `ROXY_GSV_REF_AUDIO` | 默认参考音频路径 | `/path/to/reference.wav` |
+
+可选变量：
+
+| 变量 | 默认值 | 说明 |
+|------|------|------|
+| `ROXY_GSV_PROMPT_LANG` | `ja` | 参考音频语种 |
+| `ROXY_GSV_TEXT_LANG` | `zh` | 输出语种 |
+| `ROXY_GSV_HOST` | `127.0.0.1` | 监听地址 |
+| `ROXY_GSV_PORT` | `9881` | 监听端口 |
 
 ## 启动
 
 ```bash
-/Users/umikok7/Desktop/python/my-deer-flow/scripts/tts/run_roxy_gsv_service.sh
+# 设置环境变量后启动
+export ROXY_GSV_DEPLOY_ROOT=/path/to/gpt-sovits-roxy
+export ROXY_GSV_T2S_WEIGHTS=/path/to/YourChar.ckpt
+export ROXY_GSV_VITS_WEIGHTS=/path/to/YourChar.pth
+export ROXY_GSV_REF_AUDIO=/path/to/reference.wav
+
+scripts/tts/run_roxy_gsv_service.sh
 ```
 
 默认监听：
@@ -79,14 +97,13 @@ curl -X POST http://127.0.0.1:9881/tts/file \
 
 如果不传 `prompt_text`，服务会自动用参考音频文件名作为默认 prompt 文本。
 
-## 环境变量
+## 换用自己的角色声线
 
-可选覆盖项：
+只需设置不同的权重路径和环境变量即可：
 
-- `ROXY_GSV_T2S_WEIGHTS`
-- `ROXY_GSV_VITS_WEIGHTS`
-- `ROXY_GSV_REF_AUDIO`
-- `ROXY_GSV_PROMPT_LANG`
-- `ROXY_GSV_TEXT_LANG`
-- `ROXY_GSV_HOST`
-- `ROXY_GSV_PORT`
+```bash
+export ROXY_GSV_T2S_WEIGHTS=/path/to/YourCharacter.ckpt
+export ROXY_GSV_VITS_WEIGHTS=/path/to/YourCharacter.pth
+export ROXY_GSV_REF_AUDIO=/path/to/your-reference.wav
+scripts/tts/run_roxy_gsv_service.sh
+```

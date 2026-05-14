@@ -164,6 +164,7 @@ const VOICE_CLIP_FILES = {
     partial_issue_a: 'partial_issue_a.wav',
     hard_failure_a: 'hard_failure_a.wav',
     reminder_due_a: 'reminder_due_a.wav',
+    reminder_start_simple_a: 'reminder_start_simple_a.wav',
 };
 
 const EXTERNAL_COMPLETION_EVENTS = {
@@ -313,7 +314,7 @@ function handlePetInteraction(interactionType) {
     if (interactionType === 'double') {
         createDialogWindow();
         if (hasPlayedIntroVoice) {
-            emitVoiceKey('dialog_open_a');
+            emitVoiceKey(selectRandomVoiceKey(['dialog_open_a', 'reminder_start_simple_a']));
             return;
         }
         hasPlayedIntroVoice = true;
